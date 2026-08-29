@@ -1,0 +1,1101 @@
+<<<<<<< HEAD
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, test, feature-swagger ]
+  pull_request:
+    branches: [ main, test, feature-swagger ]
+  workflow_dispatch:
+    inputs:
+      force_build_all:
+        description: 'Force build and push all Docker images'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  # 1. Build and test all Java Spring Boot microservices in parallel
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [order-service, inventory-service, payment-service, notification-service]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and Test with Maven
+        run: |
+          cd ${{ matrix.service }}
+          mvn -B clean package
+
+      - name: Upload compiled JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-jar
+          path: ${{ matrix.service }}/target/*.jar
+          retention-days: 1
+
+  # 2. Detect which services have changed files
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ github.event_name == 'workflow_dispatch' && '["order-service", "inventory-service", "payment-service", "notification-service"]' || steps.filter.outputs.changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for changes in service folders
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            order-service:
+              - 'order-service/**'
+            inventory-service:
+              - 'inventory-service/**'
+            payment-service:
+              - 'payment-service/**'
+            notification-service:
+              - 'notification-service/**'
+
+  # 3. Build and push individual Docker images to Docker Hub (on push / workflow_dispatch for main/test/feature-swagger branches)
+  build-and-push-docker:
+    runs-on: ubuntu-latest
+    needs: [build-and-test, detect-changes]
+    if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || github.ref == 'refs/heads/feature-swagger') && needs.detect-changes.outputs.services != '[]' && needs.detect-changes.outputs.services != '' }}
+    strategy:
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download compiled JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.service }}-jar
+          path: ./${{ matrix.service }}/target/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+=======
+name: E-Commerce Saga CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - feature-swagger
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+# ============================================================
+# GLOBAL PERMISSIONS
+# ============================================================
+permissions:
+  contents: read
+
+# ============================================================
+# GLOBAL VARIABLES
+# ============================================================
+env:
+  AWS_REGION: ap-south-1
+  DOCKERHUB_USERNAME: sagarbhond
+
+# ============================================================
+# JOB 1 - BUILD AND TEST
+# ============================================================
+jobs:
+
+  build-and-test:
+    name: Build and Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        service:
+          - order-service
+          - inventory-service
+          - payment-service
+          - notification-service
+
+    steps:
+
+      # --------------------------------------------------------
+      # CHECKOUT
+      # --------------------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      # --------------------------------------------------------
+      # JAVA
+      # --------------------------------------------------------
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # --------------------------------------------------------
+      # CHECK SERVICE
+      # --------------------------------------------------------
+      - name: Check Service
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "Service: ${{ matrix.service }}"
+          echo "=========================================="
+
+          if [ ! -d "${{ matrix.service }}" ]; then
+            echo "ERROR: Service directory not found."
+            exit 1
+          fi
+
+          ls -la "${{ matrix.service }}"
+
+      # --------------------------------------------------------
+      # BUILD AND TEST
+      # --------------------------------------------------------
+      - name: Build and Test Service
+        shell: bash
+        working-directory: ${{ matrix.service }}
+        run: |
+          if [ -f "mvnw" ]; then
+            chmod +x mvnw
+            ./mvnw clean test package
+          elif [ -f "pom.xml" ]; then
+            mvn clean test package
+          else
+            echo "ERROR: pom.xml or mvnw not found."
+            exit 1
+          fi
+
+
+  # ============================================================
+  # JOB 2 - DOCKER BUILD AND PUSH
+  # ============================================================
+  build-and-push-docker:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    needs:
+      - build-and-test
+
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch'
+
+    steps:
+
+      # --------------------------------------------------------
+      # CHECKOUT
+      # --------------------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      # --------------------------------------------------------
+      # DOCKER
+      # --------------------------------------------------------
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # --------------------------------------------------------
+      # DOCKER HUB LOGIN
+      # --------------------------------------------------------
+      - name: Login to Docker Hub
+>>>>>>> e58a6c228420f06c1a9104abb13ad8bc26f35000
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+<<<<<<< HEAD
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature-swagger' }}
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          file: ./${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # 4. Verify that Docker Compose builds successfully
+  docker-compose-build:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify Docker Compose Build
+        run: |
+          docker compose build
+
+  # 5. Deploy App Stack + Monitoring Stack to EC2 via SSM (runs after successful build/push)
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build-and-push-docker, docker-compose-build]
+    if: ${{ github.event_name == 'workflow_dispatch' || ( github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature-swagger') ) }}
+    steps:
+      - name: Configure AWS credentials (OIDC, no static keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy App Stack to Instance #1
+        run: |
+          # ── Resolve both Instance IDs and IPs in runner (single AWS call each) ──
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=ecom-saga-app" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
+            echo "❌ No running EC2 instance found with tag Name=ecom-saga-app"
+            echo "Run: cd Infrastructure && terraform apply -auto-approve"
+            exit 1
+          fi
+
+          # Resolve monitoring IP here (runner has IAM access) so EC2 never needs to call AWS
+          MONITORING_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=ecom-saga-monitoring" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text 2>/dev/null || echo "")
+          echo "Deploying App Stack to instance: $INSTANCE_ID (Monitoring IP: $MONITORING_IP)"
+
+          # ── Wait for SSM agent ────────────────────────────────────────────────
+          for i in $(seq 1 30); do
+=======
+      # --------------------------------------------------------
+      # CHECK DOCKERFILES
+      # --------------------------------------------------------
+      - name: Check Dockerfiles
+        shell: bash
+        run: |
+          echo "Checking Dockerfiles..."
+
+          for service in \
+            order-service \
+            inventory-service \
+            payment-service \
+            notification-service
+          do
+            if [ ! -f "$service/Dockerfile" ]; then
+              echo "ERROR: $service/Dockerfile not found."
+              exit 1
+            fi
+
+            echo "$service/Dockerfile found."
+          done
+
+      # --------------------------------------------------------
+      # BUILD ORDER SERVICE
+      # --------------------------------------------------------
+      - name: Build Order Service
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-order-service:latest \
+            ./order-service
+
+      # --------------------------------------------------------
+      # BUILD INVENTORY SERVICE
+      # --------------------------------------------------------
+      - name: Build Inventory Service
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-inventory-service:latest \
+            ./inventory-service
+
+      # --------------------------------------------------------
+      # BUILD PAYMENT SERVICE
+      # --------------------------------------------------------
+      - name: Build Payment Service
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-payment-service:latest \
+            ./payment-service
+
+      # --------------------------------------------------------
+      # BUILD NOTIFICATION SERVICE
+      # --------------------------------------------------------
+      - name: Build Notification Service
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-notification-service:latest \
+            ./notification-service
+
+      # --------------------------------------------------------
+      # PUSH ORDER
+      # --------------------------------------------------------
+      - name: Push Order Service
+        run: |
+          docker push \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-order-service:latest
+
+      # --------------------------------------------------------
+      # PUSH INVENTORY
+      # --------------------------------------------------------
+      - name: Push Inventory Service
+        run: |
+          docker push \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-inventory-service:latest
+
+      # --------------------------------------------------------
+      # PUSH PAYMENT
+      # --------------------------------------------------------
+      - name: Push Payment
+        run: |
+          docker push \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-payment-service:latest
+
+      # --------------------------------------------------------
+      # PUSH NOTIFICATION
+      # --------------------------------------------------------
+      - name: Push Notification
+        run: |
+          docker push \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-notification-service:latest
+
+      # --------------------------------------------------------
+      # COMPLETE
+      # --------------------------------------------------------
+      - name: Docker Build Complete
+        run: |
+          echo "=========================================="
+          echo "All Docker images pushed successfully"
+          echo "=========================================="
+
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-order-service:latest"
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-inventory-service:latest"
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-payment-service:latest"
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/ecom-saga-notification-service:latest"
+
+
+  # ============================================================
+  # JOB 3 - DOCKER COMPOSE VALIDATION
+  # ============================================================
+  docker-compose-build:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+
+    needs:
+      - build-and-test
+
+    steps:
+
+      # --------------------------------------------------------
+      # CHECKOUT
+      # --------------------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      # --------------------------------------------------------
+      # DOCKER VERSION
+      # --------------------------------------------------------
+      - name: Check Docker
+        run: |
+          docker --version
+          docker compose version
+
+      # --------------------------------------------------------
+      # CHECK COMPOSE FILE
+      # --------------------------------------------------------
+      - name: Check docker-compose.yml
+        shell: bash
+        run: |
+          if [ ! -f "docker-compose.yml" ]; then
+            echo "ERROR: docker-compose.yml not found."
+            exit 1
+          fi
+
+          echo "docker-compose.yml found."
+
+      # --------------------------------------------------------
+      # VALIDATE COMPOSE
+      #
+      # Dummy variables prevent warnings if the compose file
+      # contains ${INSTANCE_ID}, ${i}, or ${PING}.
+      # --------------------------------------------------------
+      - name: Validate Docker Compose
+        shell: bash
+        run: |
+          INSTANCE_ID=dummy \
+          i=1 \
+          PING=dummy \
+          docker compose -f docker-compose.yml config
+
+      # --------------------------------------------------------
+      # COMPLETE
+      # --------------------------------------------------------
+      - name: Compose Validation Complete
+        run: |
+          echo "=========================================="
+          echo "Docker Compose configuration is valid"
+          echo "=========================================="
+
+
+  # ============================================================
+  # JOB 4 - DEPLOY TO EC2
+  # ============================================================
+  deploy:
+    name: Deploy Application to EC2
+    runs-on: ubuntu-latest
+
+    needs:
+      - build-and-push-docker
+      - docker-compose-build
+
+    # ----------------------------------------------------------
+    # DEPLOY ONLY FROM MAIN / FEATURE-SWAGGER / MANUAL
+    # ----------------------------------------------------------
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        (
+          github.ref == 'refs/heads/main' ||
+          github.ref == 'refs/heads/feature-swagger'
+        )
+      )
+
+    # ----------------------------------------------------------
+    # GITHUB ENVIRONMENT
+    # ----------------------------------------------------------
+    environment:
+      name: production
+
+    # ----------------------------------------------------------
+    # OIDC PERMISSION
+    # ----------------------------------------------------------
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+
+      # --------------------------------------------------------
+      # CHECKOUT
+      # --------------------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      # --------------------------------------------------------
+      # SHOW DEPLOYMENT INFORMATION
+      # --------------------------------------------------------
+      - name: Deployment Information
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "E-COMMERCE SAGA DEPLOYMENT"
+          echo "=========================================="
+          echo "Repository : $GITHUB_REPOSITORY"
+          echo "Branch     : $GITHUB_REF_NAME"
+          echo "Commit     : $GITHUB_SHA"
+          echo "Environment: production"
+          echo "AWS Region : $AWS_REGION"
+          echo "=========================================="
+
+      # --------------------------------------------------------
+      # DEBUG - CONFIRM WHICH ROLE ARN IS BEING USED
+      # (temporary - remove once auth is confirmed working)
+      # --------------------------------------------------------
+      - name: Debug Role ARN
+        shell: bash
+        run: |
+          echo "Role ARN ends with: ${AWS_ROLE_ARN: -30}"
+          echo "Role ARN length: ${#AWS_ROLE_ARN}"
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+
+      # --------------------------------------------------------
+      # DEBUG - PRINT ACTUAL OIDC TOKEN CLAIMS
+      # These fields (sub/aud/repository/environment/ref) are not
+      # secret - they are the same metadata visible in every job's
+      # context. Printing them lets us compare, character for
+      # character, against the IAM trust policy condition.
+      # (temporary - remove once auth is confirmed working)
+      # --------------------------------------------------------
+      - name: Debug OIDC Token Claims
+        shell: bash
+        run: |
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | python3 -c "import sys, json; print(json.load(sys.stdin)['value'])")
+          PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f2)
+          python3 -c "import base64, json; p='$PAYLOAD'; p+='='*(-len(p)%4); c=json.loads(base64.urlsafe_b64decode(p)); [print(f'{k}: {c.get(k)}') for k in ['sub','aud','repository','repository_owner','environment','ref','workflow']]"
+
+      # --------------------------------------------------------
+      # AWS OIDC AUTHENTICATION
+      # --------------------------------------------------------
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          audience: sts.amazonaws.com
+          role-session-name: github-actions-ecom-saga
+          allowed-account-ids: '882040517001'
+
+      # --------------------------------------------------------
+      # VERIFY AWS
+      # --------------------------------------------------------
+      - name: Verify AWS Authentication
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "AWS OIDC Authentication Successful"
+          echo "=========================================="
+
+          aws sts get-caller-identity
+
+          echo "=========================================="
+          echo "AWS Region"
+          echo "=========================================="
+
+          aws configure get region
+
+      # --------------------------------------------------------
+      # FIND EC2 INSTANCE
+      # --------------------------------------------------------
+      - name: Find EC2 Instance
+        id: ec2
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "Finding EC2 instance"
+          echo "=========================================="
+
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:Name,Values=ecom-saga-app" \
+              "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+
+          echo "Instance ID: $INSTANCE_ID"
+
+          if [ "$INSTANCE_ID" = "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "ERROR: No running EC2 instance found."
+            echo "Expected tag:"
+            echo "Name=ecom-saga-app"
+            exit 1
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
+      # --------------------------------------------------------
+      # CHECK EC2 INFORMATION
+      # --------------------------------------------------------
+      - name: Get EC2 Information
+        shell: bash
+        run: |
+          INSTANCE_ID="${{ steps.ec2.outputs.instance_id }}"
+
+          aws ec2 describe-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].[InstanceId,InstanceType,State.Name,PrivateIpAddress,PublicIpAddress]" \
+            --output table
+
+      # --------------------------------------------------------
+      # WAIT FOR SSM
+      # --------------------------------------------------------
+      - name: Wait for SSM Agent
+        shell: bash
+        run: |
+          INSTANCE_ID="${{ steps.ec2.outputs.instance_id }}"
+
+          echo "=========================================="
+          echo "Waiting for SSM Agent"
+          echo "Instance: $INSTANCE_ID"
+          echo "=========================================="
+
+          for i in $(seq 1 30); do
+
+>>>>>>> e58a6c228420f06c1a9104abb13ad8bc26f35000
+            PING=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text 2>/dev/null || echo "Offline")
+<<<<<<< HEAD
+            [ "$PING" == "Online" ] && echo "SSM agent Online!" && break
+            echo "SSM agent status: $PING. Waiting 10s... ($i/30)"
+            sleep 10
+          done
+
+          if [ "$PING" != "Online" ]; then
+            echo "❌ SSM agent on $INSTANCE_ID is not online. Cannot deploy."
+            exit 1
+          fi
+
+          # ── Determine target branch ───────────────────────────────────────────
+          TARGET_BRANCH="${{ github.ref_name }}"
+          if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" == "" ]; then
+            TARGET_BRANCH="feature-swagger"
+          fi
+          echo "Target branch: $TARGET_BRANCH"
+
+          # ── Send deployment command to Instance #1 ────────────────────────────
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy App ${{ github.sha }}" \
+            --parameters "{\"commands\":[
+              \"set -e\",
+              \"if [ ! -d /home/ec2-user/app/.git ]; then git clone https://github.com/SagarBhond/ecom-saga-project.git /home/ec2-user/app; fi\",
+              \"cd /home/ec2-user/app\",
+              \"git fetch origin && git checkout ${TARGET_BRANCH} && git pull origin ${TARGET_BRANCH}\",
+              \"if [ ! -f .env ]; then cp .env.example .env; fi\",
+              \"if [ -n '${MONITORING_IP}' ] && [ '${MONITORING_IP}' != 'None' ]; then sed -i '/^LOKI_URL=/d' .env && echo LOKI_URL=http://${MONITORING_IP}:3100/loki/api/v1/push >> .env; fi\",
+              \"docker compose -f docker-compose.yml -f Infrastructure/docker-compose.prod.yml up -d --force-recreate\",
+              \"for i in {1..20}; do if curl -sf http://localhost:8081/actuator/health && curl -sf http://localhost:8082/actuator/health && curl -sf http://localhost:8083/actuator/health && curl -sf http://localhost:8084/actuator/health; then echo All services healthy!; exit 0; fi; sleep 3; done\",
+              \"echo App Stack deployment complete\"
+            ]}" \
+            --query "Command.CommandId" --output text)
+
+          echo "Waiting for App Stack deployment to complete..."
+          while true; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" --output text 2>/dev/null || echo "Pending")
+            if [ "$STATUS" == "Success" ]; then
+              echo "✅ App Stack deployed!"
+              break
+            elif [[ "$STATUS" == "Failed" || "$STATUS" == "TimedOut" || "$STATUS" == "Cancelled" ]]; then
+              echo "❌ Deployment failed: $STATUS"
+              aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+              exit 1
+            fi
+            sleep 3
+          done
+
+      - name: Deploy Monitoring Stack to Instance #2
+        run: |
+          # ── Resolve Instance #2 by Name tag ──────────────────────────────────
+          MONITORING_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=ecom-saga-monitoring" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -z "$MONITORING_INSTANCE_ID" ] || [ "$MONITORING_INSTANCE_ID" == "None" ]; then
+            echo "⚠️  No monitoring instance found, skipping monitoring stack deployment."
+            exit 0
+          fi
+          echo "Deploying Monitoring Stack to instance: $MONITORING_INSTANCE_ID"
+
+          # ── Wait for SSM agent ────────────────────────────────────────────────
+          for i in $(seq 1 30); do
+            PING=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$MONITORING_INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text 2>/dev/null || echo "Offline")
+            [ "$PING" == "Online" ] && echo "Monitoring SSM agent Online!" && break
+            echo "Monitoring SSM status: $PING. Waiting 10s... ($i/30)"
+            sleep 10
+          done
+
+          if [ "$PING" != "Online" ]; then
+            echo "❌ Monitoring SSM agent on $MONITORING_INSTANCE_ID is not online. Cannot deploy."
+            exit 1
+          fi
+
+          # ── Determine target branch ───────────────────────────────────────────
+          TARGET_BRANCH="${{ github.ref_name }}"
+          if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" == "" ]; then
+            TARGET_BRANCH="feature-swagger"
+          fi
+          echo "Target branch: $TARGET_BRANCH"
+
+          # Resolve app IP in runner (has IAM access) - no AWS calls needed on EC2
+          APP_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=ecom-saga-app" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text 2>/dev/null || echo "")
+          echo "App Instance IP: $APP_IP"
+
+          # ── Send deployment command to Instance #2 ────────────────────────────
+          MONITORING_CMD_ID=$(aws ssm send-command \
+            --instance-ids "$MONITORING_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Monitoring ${{ github.sha }}" \
+            --parameters "{\"commands\":[
+              \"set -e\",
+              \"if [ ! -d /home/ec2-user/app/.git ]; then git clone https://github.com/SagarBhond/ecom-saga-project.git /home/ec2-user/app; fi\",
+              \"cd /home/ec2-user/app\",
+              \"git fetch origin && git checkout ${TARGET_BRANCH} && git pull origin ${TARGET_BRANCH}\",
+              \"git checkout -- config/prometheus.yml\",
+              \"sed -i 's|order-service:8081|${APP_IP}:8081|g; s|inventory-service:8082|${APP_IP}:8082|g; s|payment-service:8083|${APP_IP}:8083|g; s|notification-service:8084|${APP_IP}:8084|g; s|node-exporter:9100|${APP_IP}:9100|g; s|cadvisor:8080|${APP_IP}:8080|g' config/prometheus.yml\",
+              \"docker compose -f docker-compose.monitoring.yml up -d --force-recreate\",
+              \"echo Monitoring Stack deployment complete\"
+            ]}" \
+            --query "Command.CommandId" --output text)
+
+          echo "Waiting for Monitoring Stack deployment to complete..."
+          while true; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$MONITORING_CMD_ID" \
+              --instance-id "$MONITORING_INSTANCE_ID" \
+              --query "Status" --output text 2>/dev/null || echo "Pending")
+            if [ "$STATUS" == "Success" ]; then
+              echo "✅ Monitoring Stack deployed!"
+              break
+            elif [[ "$STATUS" == "Failed" || "$STATUS" == "TimedOut" || "$STATUS" == "Cancelled" ]]; then
+              echo "❌ Monitoring deployment failed: $STATUS"
+              aws ssm get-command-invocation --command-id "$MONITORING_CMD_ID" --instance-id "$MONITORING_INSTANCE_ID"
+              exit 1
+            fi
+            sleep 3
+          done
+=======
+
+            echo "Attempt $i/30"
+            echo "SSM status: $PING"
+
+            if [ "$PING" = "Online" ]; then
+              echo "=========================================="
+              echo "SSM Agent is ONLINE"
+              echo "=========================================="
+              exit 0
+            fi
+
+            sleep 10
+
+          done
+
+          echo "ERROR: SSM Agent is not online."
+          exit 1
+
+      # --------------------------------------------------------
+      # SEND DEPLOYMENT COMMAND
+      # --------------------------------------------------------
+      - name: Deploy Application via SSM
+        id: deploy
+        shell: bash
+        run: |
+          INSTANCE_ID="${{ steps.ec2.outputs.instance_id }}"
+
+          echo "=========================================="
+          echo "Sending deployment command"
+          echo "Instance: $INSTANCE_ID"
+          echo "=========================================="
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "GitHub Actions E-Commerce Saga Deployment" \
+            --parameters 'commands=[
+              "set -e",
+              "echo ==========================================",
+              "echo E-Commerce Saga Deployment Started",
+              "echo ==========================================",
+              "cd /opt/ecom-saga-project",
+              "echo Current directory:",
+              "pwd",
+              "echo Pulling latest Docker images",
+              "docker compose pull",
+              "echo Stopping old containers",
+              "docker compose down",
+              "echo Starting containers",
+              "docker compose up -d",
+              "echo Waiting for containers",
+              "sleep 15",
+              "echo Container status",
+              "docker compose ps",
+              "echo Cleaning unused images",
+              "docker image prune -f",
+              "echo ==========================================",
+              "echo Deployment Completed",
+              "echo =========================================="
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          if [ -z "$COMMAND_ID" ] || [ "$COMMAND_ID" = "None" ]; then
+            echo "ERROR: SSM command was not created."
+            exit 1
+          fi
+
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+
+      # --------------------------------------------------------
+      # WAIT FOR DEPLOYMENT
+      # --------------------------------------------------------
+      - name: Wait for Deployment
+        shell: bash
+        run: |
+          INSTANCE_ID="${{ steps.ec2.outputs.instance_id }}"
+          COMMAND_ID="${{ steps.deploy.outputs.command_id }}"
+
+          echo "=========================================="
+          echo "Waiting for SSM deployment"
+          echo "Command ID: $COMMAND_ID"
+          echo "=========================================="
+
+          for i in $(seq 1 60); do
+
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "Attempt $i/60"
+            echo "Status: $STATUS"
+
+            case "$STATUS" in
+
+              Success)
+                echo "=========================================="
+                echo "DEPLOYMENT SUCCESSFUL"
+                echo "=========================================="
+
+                echo "OUTPUT:"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$INSTANCE_ID" \
+                  --query "StandardOutputContent" \
+                  --output text
+
+                exit 0
+                ;;
+
+              Failed|Cancelled|TimedOut)
+                echo "=========================================="
+                echo "DEPLOYMENT FAILED"
+                echo "=========================================="
+
+                echo ""
+                echo "STANDARD OUTPUT:"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$INSTANCE_ID" \
+                  --query "StandardOutputContent" \
+                  --output text
+
+                echo ""
+                echo "STANDARD ERROR:"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$INSTANCE_ID" \
+                  --query "StandardErrorContent" \
+                  --output text
+
+                exit 1
+                ;;
+
+              *)
+                sleep 10
+                ;;
+
+            esac
+
+          done
+
+          echo "ERROR: Deployment timed out."
+          exit 1
+
+      # --------------------------------------------------------
+<<<<<<< HEAD
+=======
+      # DEPLOY MONITORING STACK
+      #
+      # Redeploys Grafana/Prometheus/Loki on the monitoring EC2
+      # instance so config changes (e.g. prometheus.yml) take
+      # effect on every push, not just at first Terraform boot.
+      # Non-fatal if the monitoring instance isn't running - the
+      # app deploy above already succeeded and shouldn't be
+      # blocked by monitoring being down.
+      # --------------------------------------------------------
+      - name: Find Monitoring Instance
+        id: monitoring
+        shell: bash
+        run: |
+          MONITORING_ID=$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:Name,Values=ecom-saga-monitoring" \
+              "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+
+          if [ "$MONITORING_ID" = "None" ] || [ -z "$MONITORING_ID" ]; then
+            echo "WARNING: No running monitoring instance found. Skipping monitoring deploy."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "instance_id=$MONITORING_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Get App Instance Private IP
+        id: app_ip
+        if: steps.monitoring.outputs.found == 'true'
+        shell: bash
+        run: |
+          APP_PRIVATE_IP=$(aws ec2 describe-instances \
+            --instance-ids "${{ steps.ec2.outputs.instance_id }}" \
+            --query "Reservations[0].Instances[0].PrivateIpAddress" \
+            --output text)
+
+          echo "App private IP: $APP_PRIVATE_IP"
+          echo "private_ip=$APP_PRIVATE_IP" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Monitoring SSM Agent
+        if: steps.monitoring.outputs.found == 'true'
+        shell: bash
+        run: |
+          MONITORING_ID="${{ steps.monitoring.outputs.instance_id }}"
+
+          for i in $(seq 1 30); do
+            PING=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$MONITORING_ID" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text 2>/dev/null || echo "Offline")
+
+            echo "Attempt $i/30 - SSM status: $PING"
+
+            if [ "$PING" = "Online" ]; then
+              echo "Monitoring SSM Agent is ONLINE"
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "ERROR: Monitoring SSM Agent is not online."
+          exit 1
+
+      - name: Deploy Monitoring Stack via SSM
+        id: deploy_monitoring
+        if: steps.monitoring.outputs.found == 'true'
+        shell: bash
+        run: |
+          MONITORING_ID="${{ steps.monitoring.outputs.instance_id }}"
+          APP_IP="${{ steps.app_ip.outputs.private_ip }}"
+          BRANCH="$GITHUB_REF_NAME"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$MONITORING_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Redeploy monitoring stack ${{ github.sha }}" \
+            --parameters "{\"commands\":[
+              \"set -e\",
+              \"cd /home/ec2-user/app\",
+              \"git fetch origin\",
+              \"git checkout ${BRANCH}\",
+              \"git pull origin ${BRANCH}\",
+              \"git checkout -- config/prometheus.yml\",
+              \"sed -i 's|order-service:8081|${APP_IP}:8081|g; s|inventory-service:8082|${APP_IP}:8082|g; s|payment-service:8083|${APP_IP}:8083|g; s|notification-service:8084|${APP_IP}:8084|g; s|node-exporter:9100|${APP_IP}:9100|g; s|cadvisor:8080|${APP_IP}:8080|g' config/prometheus.yml\",
+              \"docker compose -f docker-compose.yml up -d --force-recreate prometheus loki grafana\",
+              \"echo Monitoring stack deployment complete\"
+            ]}" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Monitoring Deployment
+        if: steps.monitoring.outputs.found == 'true'
+        shell: bash
+        run: |
+          MONITORING_ID="${{ steps.monitoring.outputs.instance_id }}"
+          COMMAND_ID="${{ steps.deploy_monitoring.outputs.command_id }}"
+
+          for i in $(seq 1 30); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$MONITORING_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "Attempt $i/30 - Status: $STATUS"
+
+            case "$STATUS" in
+              Success)
+                echo "Monitoring stack deployed successfully."
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut)
+                echo "ERROR: Monitoring deployment failed: $STATUS"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$MONITORING_ID" \
+                  --query "StandardErrorContent" \
+                  --output text
+                exit 1
+                ;;
+              *)
+                sleep 5
+                ;;
+            esac
+          done
+
+          echo "ERROR: Monitoring deployment timed out."
+          exit 1
+
+      # --------------------------------------------------------
+>>>>>>> 4e7f136 (Update E-Commerce Saga project)
+      # FINAL SUMMARY
+      # --------------------------------------------------------
+      - name: Deployment Summary
+        if: success()
+        shell: bash
+        run: |
+          echo ""
+          echo "================================================"
+          echo "       E-COMMERCE SAGA DEPLOYMENT SUCCESS"
+          echo "================================================"
+          echo "Repository : $GITHUB_REPOSITORY"
+          echo "Branch     : $GITHUB_REF_NAME"
+          echo "Commit     : $GITHUB_SHA"
+          echo "Environment: production"
+          echo "AWS Region : $AWS_REGION"
+          echo "EC2 ID     : ${{ steps.ec2.outputs.instance_id }}"
+<<<<<<< HEAD
+=======
+          echo "Monitoring : ${{ steps.monitoring.outputs.instance_id || 'not deployed' }}"
+>>>>>>> 4e7f136 (Update E-Commerce Saga project)
+          echo "================================================"
+>>>>>>> e58a6c228420f06c1a9104abb13ad8bc26f35000
