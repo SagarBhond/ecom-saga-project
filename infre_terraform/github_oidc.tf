@@ -37,11 +37,7 @@ resource "aws_iam_role" "github_actions_deploy" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = [
-              "repo:SagarBhond/ecom-saga-project:environment:production",
-              "repo:SagarBhond/ecom-saga-project:ref:refs/heads/main",
-              "repo:SagarBhond/ecom-saga-project:ref:refs/heads/feature-swagger"
-            ]
+            "token.actions.githubusercontent.com:sub" = "repo:SagarBhond/ecom-saga-project:*"
           }
         }
       }
