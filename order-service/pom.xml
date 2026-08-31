@@ -19,7 +19,7 @@
   <description>Order Service - Saga Choreography with Outbox + Circuit Breaker</description>
 
   <properties>
-    <java.version>21</java.version>
+    <java.version>17</java.version>
     <!-- Keep Resilience4j version in sync with Spring Boot BOM -->
     <resilience4j.version>2.2.0</resilience4j.version>
   </properties>
