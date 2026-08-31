@@ -1,4 +1,4 @@
-﻿name: CI/CD Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -162,6 +162,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          role-skip-session-tagging: true
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -174,6 +175,8 @@ jobs:
             set -e
             PROJECT_DIR="/home/ec2-user/ecom-saga-project"
             REPO_URL="https://github.com/SagarBhond/ecom-saga-project.git"
+
+            git config --global --add safe.directory "$PROJECT_DIR"
 
             if [ ! -d "$PROJECT_DIR/.git" ]; then
               git clone "$REPO_URL" "$PROJECT_DIR"
