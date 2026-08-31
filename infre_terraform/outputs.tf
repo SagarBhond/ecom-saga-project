@@ -14,23 +14,28 @@ output "ssh_command" {
 }
 
 output "service_urls" {
-  description = "REST API base URLs for each service once the app is deployed"
+  description = "REST API base URLs for each service once the app is deployed. Override with app_base_url for local testing."
   value = {
-    order_service        = "http://${aws_instance.app.public_ip}:8081/api/orders"
-    inventory_service    = "http://${aws_instance.app.public_ip}:8082/api/inventory"
-    payment_service      = "http://${aws_instance.app.public_ip}:8083"
-    notification_service = "http://${aws_instance.app.public_ip}:8084/api/notifications"
+    order_service        = "${local.app_base_url}:8081/api/orders"
+    inventory_service    = "${local.app_base_url}:8082/api/inventory"
+    payment_service      = "${local.app_base_url}:8083"
+    notification_service = "${local.app_base_url}:8084/api/notifications"
   }
 }
 
 output "swagger_ui_urls" {
-  description = "Swagger UI documentation URLs for each service once deployed"
+  description = "Swagger UI documentation URLs for each service once deployed. Override with app_base_url for local testing."
   value = {
-    order_service        = "http://${aws_instance.app.public_ip}:8081/swagger-ui.html"
-    inventory_service    = "http://${aws_instance.app.public_ip}:8082/swagger-ui.html"
-    payment_service      = "http://${aws_instance.app.public_ip}:8083/swagger-ui.html"
-    notification_service = "http://${aws_instance.app.public_ip}:8084/swagger-ui.html"
+    order_service        = "${local.app_base_url}:8081/swagger-ui.html"
+    inventory_service    = "${local.app_base_url}:8082/swagger-ui.html"
+    payment_service      = "${local.app_base_url}:8083/swagger-ui.html"
+    notification_service = "${local.app_base_url}:8084/swagger-ui.html"
   }
+}
+
+output "order_create_swagger_url" {
+  description = "Direct Swagger URL for creating an order. Set app_base_url=http://localhost for local testing."
+  value       = "${local.app_base_url}:8081/swagger-ui/index.html#/order-controller/create"
 }
 
 output "monitoring_instance_id" {

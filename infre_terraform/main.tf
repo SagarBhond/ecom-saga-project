@@ -10,7 +10,14 @@ terraform {
 }
 
 provider "aws" {
-  region = var.aws_region
+  region     = var.aws_region
+  access_key = var.aws_access_key != "" ? var.aws_access_key : null
+  secret_key = var.aws_secret_key != "" ? var.aws_secret_key : null
+  token      = var.aws_session_token != "" ? var.aws_session_token : null
+}
+
+locals {
+  app_base_url = trimspace(var.app_base_url) == "" ? "http://${aws_instance.app.public_ip}" : trimspace(trimsuffix(var.app_base_url, "/"))
 }
 
 # ============================================================================

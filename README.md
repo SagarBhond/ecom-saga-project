@@ -15,7 +15,8 @@ The project includes Docker Compose for local development and a Terraform setup 
 - The duplicate `terraform/` directory was removed to avoid drift and conflicting AWS resources.
 - The deployment scripts target `/home/ec2-user/ecom-saga-project` so the project directory is consistently owned by `ec2-user`.
 - SSH-based deployment is used because the EC2 instance does not expose a working SSM host connection in practice.
-- The OIDC trust policy is configured in `infre_terraform/github_oidc.tf` and is meant to allow GitHub Actions on this repository to assume the deploy role.
+- The Terraform stack now prefers static AWS credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) and disables the GitHub OIDC role by default.
+- For local Terraform runs, set `app_base_url = "http://localhost"` if you want Swagger URLs to display as `http://localhost:8081/swagger-ui/index.html#/order-controller/create`.
 
 ## Typical validation commands
 

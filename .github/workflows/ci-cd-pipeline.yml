@@ -12,7 +12,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 env:
   AWS_REGION: ap-south-1
@@ -157,12 +156,13 @@ jobs:
     if: ${{ (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature-swagger')) || github.event_name == 'workflow_dispatch' }}
     environment: production
     steps:
-      - name: Configure AWS credentials with OIDC
+      - name: Configure AWS credentials with static keys
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
-          role-skip-session-tagging: true
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3

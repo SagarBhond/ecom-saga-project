@@ -6,15 +6,14 @@
 # workflow_dispatch.
 #
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
-#   AWS_ROLE_ARN      - IAM role ARN GitHub OIDC assumes (see note below)
-#   AWS_REGION        - e.g. ap-south-1
-#   EC2_INSTANCE_ID   - from `terraform output instance_id`
-#   DOCKERHUB_USERNAME (already exists from ci.yml)
+#   AWS_ACCESS_KEY_ID     - long-lived AWS access key ID
+#   AWS_SECRET_ACCESS_KEY - long-lived AWS secret access key
+#   AWS_SESSION_TOKEN     - optional session token for temporary creds
+#   AWS_REGION            - e.g. ap-south-1
+#   EC2_INSTANCE_ID       - from `terraform output instance_id`
+#   DOCKERHUB_USERNAME    - already exists from ci.yml
 #
-# One-time setup: create an IAM OIDC identity provider for
-# token.actions.githubusercontent.com and a role trusting it, scoped to
-# ssm:SendCommand / ssm:GetCommandInvocation on this one instance. This
-# avoids storing long-lived AWS access keys as GitHub secrets.
+# This deployment uses static AWS credentials instead of GitHub OIDC.
 
 name: Deploy to EC2
 
@@ -26,7 +25,6 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  id-token: write   # required for OIDC
   contents: read
 
 jobs:
@@ -34,10 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Configure AWS credentials (OIDC, no static keys)
+      - name: Configure AWS credentials (static keys)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Pull latest code, images and restart the stack

@@ -81,3 +81,30 @@ variable "my_ip_cidr" {
   type        = string
   default     = "0.0.0.0/0"
 }
+
+variable "aws_access_key" {
+  description = "Optional AWS access key ID. If set, Terraform uses static credentials instead of the default credential chain."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "aws_secret_key" {
+  description = "Optional AWS secret access key. If set, Terraform uses static credentials instead of the default credential chain."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "aws_session_token" {
+  description = "Optional AWS session token for temporary credentials."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "app_base_url" {
+  description = "Optional base URL override for generated Swagger and API URLs. For local testing, set this to http://localhost."
+  type        = string
+  default     = ""
+}
