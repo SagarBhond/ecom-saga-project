@@ -16,7 +16,8 @@ The project includes Docker Compose for local development and a Terraform setup 
 - The deployment scripts target `/home/ec2-user/ecom-saga-project` so the project directory is consistently owned by `ec2-user`.
 - SSH-based deployment is used because the EC2 instance does not expose a working SSM host connection in practice.
 - The Terraform stack now prefers static AWS credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) and disables the GitHub OIDC role by default.
-- For local Terraform runs, set `app_base_url = "http://localhost"` if you want Swagger URLs to display as `http://localhost:8081/swagger-ui/index.html#/order-controller/create`.
+- Generated Swagger URLs default to the EC2 public IP, so the order endpoint appears as `http://<public-ip>:8081/swagger-ui/index.html#/order-controller/create`.
+- For local Terraform runs, set `app_base_url = "http://localhost"` to override the URL to `http://localhost:8081/swagger-ui/index.html#/order-controller/create`.
 
 ## Typical validation commands
 

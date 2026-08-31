@@ -104,7 +104,7 @@ variable "aws_session_token" {
 }
 
 variable "app_base_url" {
-  description = "Optional base URL override for generated Swagger and API URLs. For local testing, set this to http://localhost."
+  description = "Base URL used in generated Swagger/API URLs. Defaults to the EC2 public IP automatically; set it to http://localhost for local testing."
   type        = string
   default     = ""
 }
