@@ -295,6 +295,13 @@ resource "aws_instance" "app" {
   depends_on = [
     aws_cloudwatch_log_group.app
   ]
+
+  # user_data only runs on first boot. Changing this file after the instance
+  # already exists must NEVER trigger a destroy/recreate of a live instance -
+  # apply any future bootstrap changes manually over SSH instead.
+  lifecycle {
+    ignore_changes = [user_data]
+  }
 }
 
 # ============================================================================
@@ -347,6 +354,12 @@ resource "aws_instance" "monitoring" {
   depends_on = [
     aws_cloudwatch_log_group.app
   ]
+
+  # Same rationale as aws_instance.app: never recreate a live instance just
+  # because monitoring_user_data.sh changed.
+  lifecycle {
+    ignore_changes = [user_data]
+  }
 }
 
 # ============================================================================
