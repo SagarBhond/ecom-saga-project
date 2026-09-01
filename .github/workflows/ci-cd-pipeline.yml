@@ -223,7 +223,10 @@ jobs:
                 "$COMPOSE version",
                 "$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml pull",
                 "$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml up -d --force-recreate",
-                "echo \"Deployment complete.\""
+                "for i in $(seq 1 30); do if curl -fsS http://localhost:8081/actuator/health >/dev/null && curl -fsS http://localhost:8082/actuator/health >/dev/null && curl -fsS http://localhost:8083/actuator/health >/dev/null && curl -fsS http://localhost:8084/actuator/health >/dev/null; then echo \"All microservices are healthy.\"; exit 0; fi; sleep 10; done",
+                "$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml ps",
+                "$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml logs --tail=80 order-service inventory-service payment-service notification-service",
+                "exit 1"
               ]
             }
           }' > /tmp/ssm-command.json
