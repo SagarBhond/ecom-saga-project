@@ -2,18 +2,24 @@
 # Bootstraps Docker + Docker Compose + App Stack + CloudWatch Agent on first boot.
 set -euo pipefail
 
-dnf update -y
-dnf install -y docker git curl amazon-cloudwatch-agent
+exec > >(tee -a /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
 
-# AL2023 may not expose amazon-ssm-agent in the configured repositories.
-if ! dnf install -y amazon-ssm-agent; then
-  curl -fsSL "https://s3.${aws_region}.amazonaws.com/amazon-ssm-${aws_region}/latest/linux_amd64/amazon-ssm-agent.rpm" \
-    -o /tmp/amazon-ssm-agent.rpm
-  dnf install -y /tmp/amazon-ssm-agent.rpm
+dnf install -y docker git curl
+dnf install -y amazon-cloudwatch-agent || true
+
+# Install SSM directly when the AL2023 repository does not provide it.
+if ! rpm -q amazon-ssm-agent; then
+  curl --fail --retry 5 --retry-delay 5 \
+    -o /tmp/amazon-ssm-agent.rpm \
+    "https://s3.${aws_region}.amazonaws.com/amazon-ssm-${aws_region}/latest/linux_amd64/amazon-ssm-agent.rpm"
+  rpm -Uvh --replacepkgs /tmp/amazon-ssm-agent.rpm
 fi
 
 systemctl enable --now docker
-systemctl enable --now amazon-ssm-agent
+systemctl daemon-reload
+systemctl enable amazon-ssm-agent
+systemctl restart amazon-ssm-agent
+systemctl is-active --quiet amazon-ssm-agent
 usermod -aG docker ec2-user
 
 # Docker Compose v2 plugin
