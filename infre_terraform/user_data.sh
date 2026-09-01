@@ -86,7 +86,4 @@ chmod +x scripts/*.sh
 # Configure Promtail to ship logs to the monitoring instance
 ./scripts/configure-monitoring-ips.sh app
 
-# Start the App Stack
-/usr/local/bin/docker-compose -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml up -d
-
-echo "Bootstrap complete." > /var/log/bootstrap-done.log
+echo "Bootstrap complete; application deployment is managed by GitHub Actions." > /var/log/bootstrap-done.log
