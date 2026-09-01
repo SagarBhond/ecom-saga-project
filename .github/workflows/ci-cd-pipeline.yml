@@ -205,7 +205,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          for i in {1..30}; do
+          for i in {1..60}; do
             PING="$(aws ssm describe-instance-information \
               --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
               --query "InstanceInformationList[0].PingStatus" \
@@ -213,11 +213,21 @@ jobs:
             if [ "$PING" = "Online" ]; then
               break
             fi
-            if [ "$i" = "30" ]; then
-              echo "ERROR: SSM agent did not become Online for $INSTANCE_ID"
+            if [ "$i" = "60" ]; then
+              echo "ERROR: SSM agent did not become Online for $INSTANCE_ID after 10 minutes"
+              echo "EC2 state and IAM profile:"
+              aws ec2 describe-instances \
+                --instance-ids "$INSTANCE_ID" \
+                --query "Reservations[0].Instances[0].{State:State.Name,IamProfile:IamInstanceProfile.Arn,Subnet:SubnetId,PublicIp:PublicIpAddress}" \
+                --output table
+              echo "SSM registration details:"
+              aws ssm describe-instance-information \
+                --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+                --output json || true
+              echo "The instance must have AmazonSSMManagedInstanceCore and network access to SSM endpoints."
               exit 1
             fi
-            sleep 5
+            sleep 10
           done
 
           jq -n --arg instance_id "$INSTANCE_ID" '{
