@@ -4,7 +4,7 @@ set -euo pipefail
 
 exec > >(tee -a /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
 
-dnf install -y docker git curl
+dnf install -y docker git
 dnf install -y amazon-cloudwatch-agent || true
 
 # Install SSM directly when the AL2023 repository does not provide it.
