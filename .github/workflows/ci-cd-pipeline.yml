@@ -205,6 +205,26 @@ jobs:
         run: |
           set -euo pipefail
 
+          PING="$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+            --query "InstanceInformationList[0].PingStatus" \
+            --output text 2>/dev/null || true)"
+          if [ "$PING" = "ConnectionLost" ]; then
+            echo "SSM agent is ConnectionLost; rebooting the EC2 instance once."
+            aws ec2 reboot-instances --instance-ids "$INSTANCE_ID"
+            sleep 30
+            for i in {1..30}; do
+              STATE="$(aws ec2 describe-instances \
+                --instance-ids "$INSTANCE_ID" \
+                --query "Reservations[0].Instances[0].State.Name" \
+                --output text)"
+              if [ "$STATE" = "running" ]; then
+                break
+              fi
+              sleep 10
+            done
+          fi
+
           for i in {1..60}; do
             PING="$(aws ssm describe-instance-information \
               --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
