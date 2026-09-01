@@ -300,7 +300,8 @@ resource "aws_instance" "app" {
   }
 
   depends_on = [
-    aws_cloudwatch_log_group.app
+    aws_cloudwatch_log_group.app,
+    aws_iam_role_policy_attachment.ssm_managed
   ]
 
   # user_data only runs on first boot. Changing this file after the instance

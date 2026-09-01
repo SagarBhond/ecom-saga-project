@@ -3,10 +3,13 @@
 set -euo pipefail
 
 dnf update -y
-dnf install -y docker git amazon-cloudwatch-agent amazon-ssm-agent
+dnf install -y docker git amazon-cloudwatch-agent || true
+dnf install -y amazon-ssm-agent || dnf install -y \
+  https://s3.$${AWS_REGION:-us-east-1}.amazonaws.com/amazon-ssm-$${AWS_REGION:-us-east-1}/latest/linux_amd64/amazon-ssm-agent.rpm
 
 systemctl enable --now docker
-systemctl enable --now amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl restart amazon-ssm-agent
 usermod -aG docker ec2-user
 
 # Docker Compose v2 plugin
@@ -64,8 +67,8 @@ fi
 
 cd /home/ec2-user/app
 git fetch origin
-git checkout feature-swagger || git checkout main
-git pull origin feature-swagger || git pull origin main
+git checkout main
+git reset --hard origin/main
 
 if [ ! -f .env ]; then cp .env.example .env; fi
 chmod +x scripts/*.sh
@@ -74,6 +77,6 @@ chmod +x scripts/*.sh
 ./scripts/configure-monitoring-ips.sh app
 
 # Start the App Stack
-/usr/local/bin/docker-compose -f docker-compose.yml -f Infrastructure/docker-compose.prod.yml up -d
+/usr/local/bin/docker-compose -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml up -d
 
 echo "Bootstrap complete." > /var/log/bootstrap-done.log
