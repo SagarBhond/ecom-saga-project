@@ -168,14 +168,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          INSTANCE_ID="$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=ecom-saga-app" \
-                      "Name=instance-state-name,Values=running" \
-            --query "Reservations[0].Instances[0].InstanceId" \
-            --output text)"
+          INSTANCE_ID=""
+          for i in {1..30}; do
+            INSTANCE_ID="$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=ecom-saga-app" \
+                        "Name=instance-state-name,Values=running" \
+              --query "Reservations[0].Instances[0].InstanceId" \
+              --output text)"
+            if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+              break
+            fi
+            STATES="$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=ecom-saga-app" \
+                        "Name=instance-state-name,Values=pending,stopping,shutting-down" \
+              --query "Reservations[*].Instances[*].{Id:InstanceId,State:State.Name}" \
+              --output text)"
+            if [ -n "$STATES" ]; then
+              echo "App instance is not running yet:"
+              echo "$STATES"
+              sleep 20
+            else
+              break
+            fi
+          done
 
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "ERROR: No running EC2 instance found with Name=ecom-saga-app"
+            echo "ERROR: No running EC2 instance found with Name=ecom-saga-app."
+            echo "Run terraform apply in infre_terraform before deploying."
             exit 1
           fi
 
