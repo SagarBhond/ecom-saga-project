@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
 
     environment:
-      KAFKA_HEAP_OPTS: "-Xmx384m -Xms384m"
+      KAFKA_HEAP_OPTS: "-Xmx256m -Xms128m"
 
 
   # ============================================================
@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
 
     environment:
-      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+      JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
       H2_CONSOLE_ENABLED: "true"
 
 
@@ -66,7 +66,7 @@ services:
     restart: unless-stopped
 
     environment:
-      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+      JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
       H2_CONSOLE_ENABLED: "true"
 
 
@@ -82,7 +82,7 @@ services:
     restart: unless-stopped
 
     environment:
-      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+      JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
       H2_CONSOLE_ENABLED: "true"
 
 
@@ -98,5 +98,5 @@ services:
     restart: unless-stopped
 
     environment:
-      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+      JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
       H2_CONSOLE_ENABLED: "true"
