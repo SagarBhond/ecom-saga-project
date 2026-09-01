@@ -292,6 +292,7 @@ resource "aws_instance" "app" {
     "${path.module}/user_data.sh",
     {
       project_name = var.project_name
+      aws_region   = var.aws_region
     }
   )
 

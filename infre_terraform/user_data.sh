@@ -3,13 +3,17 @@
 set -euo pipefail
 
 dnf update -y
-dnf install -y docker git amazon-cloudwatch-agent || true
-dnf install -y amazon-ssm-agent || dnf install -y \
-  https://s3.$${AWS_REGION:-us-east-1}.amazonaws.com/amazon-ssm-$${AWS_REGION:-us-east-1}/latest/linux_amd64/amazon-ssm-agent.rpm
+dnf install -y docker git curl amazon-cloudwatch-agent
+
+# AL2023 may not expose amazon-ssm-agent in the configured repositories.
+if ! dnf install -y amazon-ssm-agent; then
+  curl -fsSL "https://s3.${aws_region}.amazonaws.com/amazon-ssm-${aws_region}/latest/linux_amd64/amazon-ssm-agent.rpm" \
+    -o /tmp/amazon-ssm-agent.rpm
+  dnf install -y /tmp/amazon-ssm-agent.rpm
+fi
 
 systemctl enable --now docker
-systemctl enable amazon-ssm-agent
-systemctl restart amazon-ssm-agent
+systemctl enable --now amazon-ssm-agent
 usermod -aG docker ec2-user
 
 # Docker Compose v2 plugin
