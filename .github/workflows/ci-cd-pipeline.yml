@@ -169,7 +169,7 @@ jobs:
         run: |
           set -euo pipefail
           INSTANCE_ID=""
-          for i in {1..30}; do
+          for i in {1..90}; do
             INSTANCE_ID="$(aws ec2 describe-instances \
               --filters "Name=tag:Name,Values=ecom-saga-app" \
                         "Name=instance-state-name,Values=running" \
@@ -183,13 +183,13 @@ jobs:
                         "Name=instance-state-name,Values=pending,stopping,shutting-down" \
               --query "Reservations[*].Instances[*].{Id:InstanceId,State:State.Name}" \
               --output text)"
+            echo "App instance is not running yet (attempt $i/90):"
             if [ -n "$STATES" ]; then
-              echo "App instance is not running yet:"
               echo "$STATES"
-              sleep 20
             else
-              break
+              echo "No ecom-saga-app instance is currently visible; waiting for Terraform."
             fi
+            sleep 20
           done
 
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
