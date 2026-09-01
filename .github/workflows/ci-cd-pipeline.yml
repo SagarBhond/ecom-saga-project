@@ -147,7 +147,7 @@ jobs:
           docker compose build
 
   deploy:
-    name: Deploy to EC2 over SSH
+    name: Deploy to EC2 through SSM
     runs-on: ubuntu-latest
     needs:
       - build-and-push-docker
@@ -224,26 +224,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          PING="$(aws ssm describe-instance-information \
-            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
-            --query "InstanceInformationList[0].PingStatus" \
-            --output text 2>/dev/null || true)"
-          if [ "$PING" = "ConnectionLost" ]; then
-            echo "SSM agent is ConnectionLost; rebooting the EC2 instance once."
-            aws ec2 reboot-instances --instance-ids "$INSTANCE_ID"
-            sleep 30
-            for i in {1..30}; do
-              STATE="$(aws ec2 describe-instances \
-                --instance-ids "$INSTANCE_ID" \
-                --query "Reservations[0].Instances[0].State.Name" \
-                --output text)"
-              if [ "$STATE" = "running" ]; then
-                break
-              fi
-              sleep 10
-            done
-          fi
-
           for i in {1..60}; do
             PING="$(aws ssm describe-instance-information \
               --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
@@ -276,7 +256,7 @@ jobs:
             Parameters: {
               commands: [
                 "set -e",
-                "PROJECT_DIR=\"/home/ec2-user/ecom-saga-project\"",
+                "PROJECT_DIR=\"/home/ec2-user/app\"",
                 "REPO_URL=\"https://github.com/SagarBhond/ecom-saga-project.git\"",
                 "if [ ! -d \"$PROJECT_DIR/.git\" ]; then git clone \"$REPO_URL\" \"$PROJECT_DIR\"; fi",
                 "cd \"$PROJECT_DIR\"",
@@ -285,7 +265,7 @@ jobs:
                 "git reset --hard origin/main",
                 "if [ ! -f .env ] || grep -qE \"^(<<<<<<<|=======|>>>>>>>)\" .env; then cp .env.example .env; fi",
                 "chmod +x scripts/*.sh infre_terraform/*.sh",
-                "if docker compose version >/dev/null 2>&1; then COMPOSE=\"docker compose\"; elif command -v docker-compose >/dev/null 2>&1; then COMPOSE=\"docker-compose\"; else if ! command -v curl >/dev/null 2>&1; then sudo dnf install -y curl; fi; sudo mkdir -p /usr/local/lib/docker/cli-plugins; sudo curl -fsSL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose; sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose; COMPOSE=\"docker compose\"; fi",
+                "if docker compose version >/dev/null 2>&1; then COMPOSE=\"docker compose\"; elif command -v docker-compose >/dev/null 2>&1; then COMPOSE=\"docker-compose\"; else echo \"ERROR: Docker Compose is not installed on the SSM host\"; exit 1; fi",
                 "$COMPOSE version",
                 "timeout 15m $COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml pull",
                 "timeout 15m $COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml up -d --force-recreate",
