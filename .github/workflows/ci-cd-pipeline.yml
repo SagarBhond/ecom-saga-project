@@ -181,6 +181,22 @@ jobs:
 
           echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
           echo "Resolved app instance: $INSTANCE_ID"
+          PUBLIC_IP="$(aws ec2 describe-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text)"
+          if [ -z "$PUBLIC_IP" ] || [ "$PUBLIC_IP" = "None" ]; then
+            echo "ERROR: Resolved EC2 instance has no public IPv4 address"
+            exit 1
+          fi
+          echo "Current app public IP: $PUBLIC_IP"
+          {
+            echo "### Deployment endpoints"
+            echo "- Order Swagger: http://$PUBLIC_IP:8081/swagger-ui/index.html"
+            echo "- Inventory Swagger: http://$PUBLIC_IP:8082/swagger-ui/index.html"
+            echo "- Payment Swagger: http://$PUBLIC_IP:8083/swagger-ui/index.html"
+            echo "- Notification Swagger: http://$PUBLIC_IP:8084/swagger-ui/index.html"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deploy through SSM
         shell: bash
