@@ -1,0 +1,275 @@
+services:
+
+  # ============================================================
+  # KAFKA
+  # ============================================================
+
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: kafka
+    hostname: kafka
+    restart: unless-stopped
+
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      KAFKA_LISTENERS: >-
+        PLAINTEXT://0.0.0.0:9092,
+        CONTROLLER://0.0.0.0:9093,
+        EXTERNAL://0.0.0.0:9094
+
+      KAFKA_ADVERTISED_LISTENERS: >-
+        PLAINTEXT://kafka:9092,
+        EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:9094
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >-
+        CONTROLLER:PLAINTEXT,
+        PLAINTEXT:PLAINTEXT,
+        EXTERNAL:PLAINTEXT
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      KAFKA_NUM_PARTITIONS: 3
+
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+
+      KAFKA_HEAP_OPTS: "-Xmx384m -Xms384m"
+
+    ports:
+      - "${KAFKA_PORT_INTERNAL:-9092}:9092"
+      - "${KAFKA_PORT_EXTERNAL:-9094}:9094"
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+    networks:
+      - saga-net
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+
+
+  # ============================================================
+  # KAFKA UI
+  # ============================================================
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    restart: unless-stopped
+
+    ports:
+      - "${KAFKA_UI_PORT:-8090}:8080"
+
+    environment:
+      KAFKA_CLUSTERS_0_NAME: saga-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - saga-net
+
+
+  # ============================================================
+  # ORDER SERVICE
+  # ============================================================
+
+  order-service:
+    image: sagarbhond/order-service:latest
+
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+
+    container_name: order-service
+    restart: unless-stopped
+
+    ports:
+      - "${ORDER_SERVICE_PORT:-8081}:8081"
+
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-sa}
+
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
+
+      INVENTORY_SERVICE_URL: ${INVENTORY_SERVICE_URL:-http://inventory-service:8082}
+
+      PAYMENT_SERVICE_URL: ${PAYMENT_SERVICE_URL:-http://payment-service:8083}
+
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8084}
+
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+
+      H2_CONSOLE_ENABLED: ${H2_CONSOLE_ENABLED:-false}
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - saga-net
+
+
+  # ============================================================
+  # INVENTORY SERVICE
+  # ============================================================
+
+  inventory-service:
+    image: sagarbhond/inventory-service:latest
+
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+
+    container_name: inventory-service
+    restart: unless-stopped
+
+    ports:
+      - "${INVENTORY_SERVICE_PORT:-8082}:8082"
+
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-sa}
+
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
+
+      PAYMENT_SERVICE_URL: ${PAYMENT_SERVICE_URL:-http://payment-service:8083}
+
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8084}
+
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+
+      H2_CONSOLE_ENABLED: ${H2_CONSOLE_ENABLED:-false}
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - saga-net
+
+
+  # ============================================================
+  # PAYMENT SERVICE
+  # ============================================================
+
+  payment-service:
+    image: sagarbhond/payment-service:latest
+
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+
+    container_name: payment-service
+    restart: unless-stopped
+
+    ports:
+      - "${PAYMENT_SERVICE_PORT:-8083}:8083"
+
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-sa}
+
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
+
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+
+      H2_CONSOLE_ENABLED: ${H2_CONSOLE_ENABLED:-false}
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - saga-net
+
+
+  # ============================================================
+  # NOTIFICATION SERVICE
+  # ============================================================
+
+  notification-service:
+    image: sagarbhond/notification-service:latest
+
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+
+    container_name: notification-service
+    restart: unless-stopped
+
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8084}:8084"
+
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-sa}
+
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
+
+      EMAIL_SERVICE_URL: ${EMAIL_SERVICE_URL:-}
+
+      SMS_SERVICE_URL: ${SMS_SERVICE_URL:-}
+
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+
+      H2_CONSOLE_ENABLED: ${H2_CONSOLE_ENABLED:-false}
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - saga-net
+
+
+# ============================================================
+# NETWORK
+# ============================================================
+
+networks:
+  saga-net:
+    name: saga-net
+    driver: bridge
+
+
+# ============================================================
+# VOLUMES
+# ============================================================
+
+volumes:
+  kafka_data:

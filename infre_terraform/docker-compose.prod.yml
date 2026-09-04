@@ -1,0 +1,102 @@
+# ============================================================
+# PRODUCTION DOCKER COMPOSE OVERRIDE
+# ============================================================
+#
+# Usage:
+#
+# docker compose \
+#   -f docker-compose.yml \
+#   -f infre_terraform/docker-compose.prod.yml \
+#   pull
+#
+# docker compose \
+#   -f docker-compose.yml \
+#   -f infre_terraform/docker-compose.prod.yml \
+#   up -d
+#
+# ============================================================
+
+services:
+
+  # ============================================================
+  # KAFKA
+  # ============================================================
+
+  kafka:
+    restart: unless-stopped
+
+    environment:
+      KAFKA_HEAP_OPTS: "-Xmx256m -Xms128m"
+
+
+  # ============================================================
+  # KAFKA UI
+  # ============================================================
+
+  kafka-ui:
+    restart: unless-stopped
+
+
+  # ============================================================
+  # ORDER SERVICE
+  # ============================================================
+
+  order-service:
+    image: sagarbhond/order-service:latest
+
+    # EC2 should pull the image from Docker Hub.
+    build: null
+
+    restart: unless-stopped
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
+      H2_CONSOLE_ENABLED: "true"
+
+
+  # ============================================================
+  # INVENTORY SERVICE
+  # ============================================================
+
+  inventory-service:
+    image: sagarbhond/inventory-service:latest
+
+    build: null
+
+    restart: unless-stopped
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
+      H2_CONSOLE_ENABLED: "true"
+
+
+  # ============================================================
+  # PAYMENT SERVICE
+  # ============================================================
+
+  payment-service:
+    image: sagarbhond/payment-service:latest
+
+    build: null
+
+    restart: unless-stopped
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
+      H2_CONSOLE_ENABLED: "true"
+
+
+  # ============================================================
+  # NOTIFICATION SERVICE
+  # ============================================================
+
+  notification-service:
+    image: sagarbhond/notification-service:latest
+
+    build: null
+
+    restart: unless-stopped
+
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
+      H2_CONSOLE_ENABLED: "true"

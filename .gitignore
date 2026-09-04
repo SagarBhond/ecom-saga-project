@@ -1,0 +1,15 @@
+.env
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+.terraform.lock.hcl
+AWS-Deployment-Plan_1.md
+target/
+**/target/
+.idea/
+<<<<<<< HEAD
+=======
+
+*.zip
+>>>>>>> e58a6c228420f06c1a9104abb13ad8bc26f35000
