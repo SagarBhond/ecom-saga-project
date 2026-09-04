@@ -7,6 +7,9 @@ on:
 
   workflow_dispatch:
 
+# ============================================================
+# GLOBAL PERMISSIONS
+# ============================================================
 permissions:
   contents: write
   pull-requests: write
@@ -36,12 +39,18 @@ jobs:
 
     steps:
 
+      # --------------------------------------------------------
+      # Checkout
+      # --------------------------------------------------------
       - name: Checkout Feature
         uses: actions/checkout@v4
         with:
           ref: feature
           fetch-depth: 0
 
+      # --------------------------------------------------------
+      # Java 21
+      # --------------------------------------------------------
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
@@ -49,65 +58,115 @@ jobs:
           java-version: '21'
           cache: maven
 
+      # --------------------------------------------------------
+      # Verify Java
+      # --------------------------------------------------------
       - name: Verify Java
         run: |
+          echo "=========================================="
+          echo "JAVA VERSION"
+          echo "=========================================="
+
           java -version
           mvn -version
 
+      # --------------------------------------------------------
+      # Check service
+      # --------------------------------------------------------
       - name: Verify Service
         run: |
+          echo "=========================================="
+          echo "CHECKING SERVICE"
+          echo "=========================================="
+
           if [ ! -d "${{ matrix.service }}" ]; then
             echo "ERROR: Service directory not found"
+            echo "${{ matrix.service }}"
             exit 1
           fi
 
           if [ ! -f "${{ matrix.service }}/pom.xml" ]; then
             echo "ERROR: pom.xml not found"
+            echo "${{ matrix.service }}/pom.xml"
             exit 1
           fi
 
+          echo "Service found:"
+          echo "${{ matrix.service }}"
+
+      # --------------------------------------------------------
+      # Maven build/test with retry
+      # --------------------------------------------------------
       - name: Maven Build and Test
         working-directory: ${{ matrix.service }}
+        shell: bash
         run: |
           set +e
 
           for attempt in 1 2 3
           do
+            echo ""
             echo "=========================================="
-            echo "Maven attempt $attempt / 3"
+            echo "MAVEN ATTEMPT $attempt / 3"
             echo "=========================================="
 
             if [ -f "./mvnw" ]; then
+
               chmod +x ./mvnw
+
               ./mvnw clean test package -U
+
               RESULT=$?
+
             else
+
               mvn clean test package -U
+
               RESULT=$?
+
             fi
 
             if [ $RESULT -eq 0 ]; then
-              echo "Maven build successful"
+
+              echo ""
+              echo "=========================================="
+              echo "MAVEN BUILD SUCCESS"
+              echo "=========================================="
+
               exit 0
+
             fi
+
+            echo ""
+            echo "Maven build failed."
 
             if [ "$attempt" -lt 3 ]; then
-              echo "Maven failed."
-              echo "Retrying after 20 seconds..."
+
+              echo "Retrying in 20 seconds..."
+
               sleep 20
+
             fi
+
           done
 
-          echo "Maven build failed after 3 attempts"
+          echo ""
+          echo "=========================================="
+          echo "MAVEN BUILD FAILED"
+          echo "=========================================="
+
           exit 1
 
 
   # ============================================================
-  # 2. DOCKER BUILD VALIDATION
+  # 2. DOCKER BUILD
   # ============================================================
   docker-build:
     name: Docker Build - ${{ matrix.service }}
-    needs: build-and-test
+
+    needs:
+      - build-and-test
+
     runs-on: ubuntu-latest
 
     strategy:
@@ -121,89 +180,169 @@ jobs:
 
     steps:
 
+      # --------------------------------------------------------
+      # Checkout
+      # --------------------------------------------------------
       - name: Checkout Feature
         uses: actions/checkout@v4
         with:
           ref: feature
 
+      # --------------------------------------------------------
+      # Docker version
+      # --------------------------------------------------------
       - name: Check Docker
         run: |
           docker --version
 
+      # --------------------------------------------------------
+      # Check Dockerfile
+      # --------------------------------------------------------
       - name: Check Dockerfile
         run: |
+          echo "Checking Dockerfile..."
+
           if [ ! -f "${{ matrix.service }}/Dockerfile" ]; then
-            echo "ERROR: Dockerfile missing"
+
+            echo "ERROR: Dockerfile not found"
+
             echo "${{ matrix.service }}/Dockerfile"
+
             exit 1
+
           fi
 
+          echo "Dockerfile found."
+
+
+      # --------------------------------------------------------
+      # Docker build
+      # --------------------------------------------------------
       - name: Build Docker Image
         run: |
+
+          echo "=========================================="
+          echo "DOCKER BUILD"
+          echo "=========================================="
+
           docker build \
             -t "${{ matrix.service }}:feature-${{ github.sha }}" \
             "./${{ matrix.service }}"
 
+
+      # --------------------------------------------------------
+      # Verify image
+      # --------------------------------------------------------
       - name: Verify Docker Image
         run: |
+
           docker image inspect \
             "${{ matrix.service }}:feature-${{ github.sha }}"
 
+          echo "Docker image verified successfully."
+
 
   # ============================================================
-  # 3. DOCKER COMPOSE VALIDATION
+  # 3. DOCKER COMPOSE
   # ============================================================
   docker-compose:
     name: Docker Compose Validation
-    needs: build-and-test
+
+    needs:
+      - build-and-test
+
     runs-on: ubuntu-latest
 
     steps:
 
+      # --------------------------------------------------------
+      # Checkout
+      # --------------------------------------------------------
       - name: Checkout Feature
         uses: actions/checkout@v4
         with:
           ref: feature
 
+      # --------------------------------------------------------
+      # Docker Compose version
+      # --------------------------------------------------------
       - name: Docker Compose Version
         run: |
           docker compose version
 
+      # --------------------------------------------------------
+      # Find compose file
+      # --------------------------------------------------------
       - name: Detect Compose File
+        shell: bash
         run: |
+
+          echo "=========================================="
+          echo "SEARCHING DOCKER COMPOSE FILE"
+          echo "=========================================="
+
           if [ -f "docker-compose.yml" ]; then
+
+            echo "Found docker-compose.yml"
+
             echo "COMPOSE_FILE=docker-compose.yml" >> "$GITHUB_ENV"
 
           elif [ -f "docker-compose.yaml" ]; then
+
+            echo "Found docker-compose.yaml"
+
             echo "COMPOSE_FILE=docker-compose.yaml" >> "$GITHUB_ENV"
 
           else
-            echo "ERROR: docker-compose.yml not found"
+
+            echo "ERROR: Docker Compose file not found"
+
             exit 1
+
           fi
 
-      - name: Validate Compose
+
+      # --------------------------------------------------------
+      # Validate compose
+      # --------------------------------------------------------
+      - name: Validate Docker Compose
         run: |
+
+          echo "=========================================="
+          echo "DOCKER COMPOSE VALIDATION"
+          echo "=========================================="
+
           docker compose \
             -f "$COMPOSE_FILE" \
             config
 
-      - name: Build Compose
+
+      # --------------------------------------------------------
+      # Build compose
+      # --------------------------------------------------------
+      - name: Build Docker Compose
         run: |
+
+          echo "=========================================="
+          echo "DOCKER COMPOSE BUILD"
+          echo "=========================================="
+
           docker compose \
             -f "$COMPOSE_FILE" \
             build
 
 
   # ============================================================
-  # 4. CHECK FEATURE → DEV DIFFERENCE
+  # 4. CHECK FEATURE → DEV CHANGES
   # ============================================================
   check-changes:
-    name: Check Feature Changes
+    name: Check Feature → Dev Changes
+
     needs:
       - build-and-test
       - docker-build
       - docker-compose
+
     runs-on: ubuntu-latest
 
     outputs:
@@ -211,50 +350,79 @@ jobs:
 
     steps:
 
+      # --------------------------------------------------------
+      # Checkout
+      # --------------------------------------------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Fetch Dev
+      # --------------------------------------------------------
+      # Fetch branches
+      # --------------------------------------------------------
+      - name: Fetch Feature and Dev
         run: |
+
           git fetch origin feature
           git fetch origin dev
 
-      - name: Check Commits
+      # --------------------------------------------------------
+      # Compare branches
+      # --------------------------------------------------------
+      - name: Check Changes
         id: check
+        shell: bash
         run: |
+
+          echo "=========================================="
+          echo "FEATURE → DEV CHANGE CHECK"
+          echo "=========================================="
+
+          FEATURE_COMMIT=$(git rev-parse origin/feature)
+          DEV_COMMIT=$(git rev-parse origin/dev)
+
+          echo "Feature commit:"
+          echo "$FEATURE_COMMIT"
+
+          echo ""
+
+          echo "Dev commit:"
+          echo "$DEV_COMMIT"
+
+          echo ""
 
           COMMITS=$(git rev-list --count origin/dev..origin/feature)
 
-          echo "=========================================="
-          echo "FEATURE → DEV CHECK"
-          echo "=========================================="
-
-          echo "Feature:"
-          git rev-parse origin/feature
-
-          echo "Dev:"
-          git rev-parse origin/dev
-
-          echo "Commits ahead of dev:"
+          echo "Commits in feature but not dev:"
           echo "$COMMITS"
 
+          echo ""
+
           if [ "$COMMITS" -gt 0 ]; then
+
             echo "Changes found."
+
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
           else
+
             echo "No changes between feature and dev."
+
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
+
           fi
 
 
   # ============================================================
-  # 5. CREATE PR
+  # 5. CREATE PULL REQUEST
   # ============================================================
   create-pr:
     name: Create Feature → Dev PR
-    needs: check-changes
+
+    needs:
+      - check-changes
+
     if: needs.check-changes.outputs.has_changes == 'true'
 
     runs-on: ubuntu-latest
@@ -268,19 +436,35 @@ jobs:
 
     steps:
 
+      # --------------------------------------------------------
+      # Create or find PR
+      # --------------------------------------------------------
       - name: Create or Find PR
         id: pr
+
         env:
           GH_TOKEN: ${{ github.token }}
+
+        shell: bash
+
         run: |
 
           echo "=========================================="
           echo "FEATURE → DEV PULL REQUEST"
           echo "=========================================="
 
-          echo "Repository: $GITHUB_REPOSITORY"
-          echo "Source: feature"
-          echo "Target: dev"
+          echo "Repository:"
+          echo "$GITHUB_REPOSITORY"
+
+          echo ""
+
+          echo "Source branch:"
+          echo "feature"
+
+          echo ""
+
+          echo "Target branch:"
+          echo "dev"
 
           echo ""
           echo "Checking existing PR..."
@@ -295,13 +479,18 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
 
-            echo "Existing PR found:"
-            echo "#$EXISTING_PR"
+            echo ""
+            echo "=========================================="
+            echo "EXISTING PR FOUND"
+            echo "=========================================="
+
+            echo "PR: #$EXISTING_PR"
 
             echo "pr_number=$EXISTING_PR" >> "$GITHUB_OUTPUT"
 
           else
 
+            echo ""
             echo "Creating new PR..."
 
             PR_URL=$(gh pr create \
@@ -314,12 +503,15 @@ jobs:
           This Pull Request was automatically created by GitHub Actions.
 
           ### Source
+
           feature
 
           ### Target
+
           dev
 
           ### CI Validation
+
           - Java 21
           - Maven build
           - Unit tests
@@ -327,15 +519,18 @@ jobs:
           - Docker Compose validation
 
           ### Pipeline
+
           feature
           ↓
-          Build & Test
+          Build
           ↓
-          Docker Validation
+          Test
+          ↓
+          Docker
+          ↓
+          Docker Compose
           ↓
           Pull Request
-          ↓
-          Automatic Approval
           ↓
           Automatic Merge
           ↓
@@ -349,8 +544,11 @@ jobs:
             echo ""
             echo "=========================================="
             echo "PR CREATED"
-            echo "PR: #$PR_NUMBER"
             echo "=========================================="
+
+            echo "PR: #$PR_NUMBER"
+
+            echo ""
 
             echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
@@ -358,48 +556,13 @@ jobs:
 
 
   # ============================================================
-  # 6. AUTOMATIC APPROVAL
-  # ============================================================
-  approve-pr:
-    name: Automatic PR Approval
-    needs: create-pr
-
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-      pull-requests: write
-
-    steps:
-
-      - name: Approve Pull Request
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ needs.create-pr.outputs.pr_number }}
-        run: |
-
-          echo "=========================================="
-          echo "AUTOMATIC PR APPROVAL"
-          echo "=========================================="
-
-          echo "PR: #$PR_NUMBER"
-
-          gh pr review "$PR_NUMBER" \
-            --repo "$GITHUB_REPOSITORY" \
-            --approve \
-            --body "Automatically approved by CI/CD pipeline."
-
-          echo "PR approved successfully."
-
-
-  # ============================================================
-  # 7. AUTOMATIC MERGE
+  # 6. AUTOMATIC MERGE
   # ============================================================
   merge-pr:
     name: Automatic Merge → Dev
+
     needs:
       - create-pr
-      - approve-pr
 
     runs-on: ubuntu-latest
 
@@ -409,17 +572,28 @@ jobs:
 
     steps:
 
+      # --------------------------------------------------------
+      # Enable auto merge
+      # --------------------------------------------------------
       - name: Enable Auto Merge
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.create-pr.outputs.pr_number }}
+
+        shell: bash
+
         run: |
 
           echo "=========================================="
           echo "AUTOMATIC MERGE"
           echo "=========================================="
 
-          echo "PR: #$PR_NUMBER"
+          echo "PR:"
+          echo "#$PR_NUMBER"
+
+          echo ""
+
+          echo "Enabling GitHub Auto Merge..."
 
           gh pr merge "$PR_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
@@ -428,25 +602,29 @@ jobs:
             --delete-branch=false
 
           echo ""
+
           echo "=========================================="
           echo "AUTO MERGE ENABLED"
           echo "=========================================="
 
-          echo "GitHub will merge the PR when all required checks are satisfied."
+          echo ""
+
+          echo "GitHub will merge the PR when all required"
+          echo "checks and branch rules are satisfied."
 
 
   # ============================================================
-  # 8. SUCCESS
+  # 7. SUCCESS SUMMARY
   # ============================================================
   success:
-    name: Feature → Dev Complete
+    name: Feature → Dev CI/CD Complete
+
     needs:
       - build-and-test
       - docker-build
       - docker-compose
       - check-changes
       - create-pr
-      - approve-pr
       - merge-pr
 
     if: |
@@ -454,7 +632,9 @@ jobs:
       needs.build-and-test.result == 'success' &&
       needs.docker-build.result == 'success' &&
       needs.docker-compose.result == 'success' &&
-      needs.check-changes.result == 'success'
+      needs.check-changes.result == 'success' &&
+      needs.create-pr.result == 'success' &&
+      needs.merge-pr.result == 'success'
 
     runs-on: ubuntu-latest
 
@@ -463,9 +643,12 @@ jobs:
       - name: Pipeline Summary
         run: |
 
+          echo ""
           echo "=========================================="
-          echo "       FEATURE → DEV CI/CD SUCCESS"
+          echo "      FEATURE → DEV CI/CD SUCCESS"
           echo "=========================================="
+
+          echo ""
 
           echo "Java 21          : PASS"
           echo "Maven            : PASS"
@@ -474,7 +657,10 @@ jobs:
           echo "Docker Compose   : PASS"
           echo "Change Detection : PASS"
           echo "PR Creation      : PASS"
-          echo "Approval         : PASS"
           echo "Auto Merge       : ENABLED"
 
+          echo ""
+
+          echo "=========================================="
+          echo "           PIPELINE COMPLETE"
           echo "=========================================="
