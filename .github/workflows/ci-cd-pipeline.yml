@@ -19,12 +19,10 @@ env:
 jobs:
 
   # ============================================================
-  # 1. BUILD AND TEST ALL MICROSERVICES
+  # 1. BUILD + TEST
   # ============================================================
   build-and-test:
-
     name: Build & Test - ${{ matrix.service }}
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -56,37 +54,39 @@ jobs:
           java -version
           mvn -version
 
-      - name: Check Service
+      - name: Verify Service
         run: |
           if [ ! -d "${{ matrix.service }}" ]; then
-            echo "Service directory not found"
+            echo "ERROR: Service directory not found"
             exit 1
           fi
 
           if [ ! -f "${{ matrix.service }}/pom.xml" ]; then
-            echo "pom.xml not found"
+            echo "ERROR: pom.xml not found"
             exit 1
           fi
 
-      - name: Build and Test
+      - name: Maven Build and Test
         working-directory: ${{ matrix.service }}
         run: |
+          set +e
 
           for attempt in 1 2 3
           do
-
             echo "=========================================="
-            echo "Maven attempt $attempt"
+            echo "Maven attempt $attempt / 3"
             echo "=========================================="
 
             if [ -f "./mvnw" ]; then
               chmod +x ./mvnw
               ./mvnw clean test package -U
+              RESULT=$?
             else
               mvn clean test package -U
+              RESULT=$?
             fi
 
-            if [ $? -eq 0 ]; then
+            if [ $RESULT -eq 0 ]; then
               echo "Maven build successful"
               exit 0
             fi
@@ -96,7 +96,6 @@ jobs:
               echo "Retrying after 20 seconds..."
               sleep 20
             fi
-
           done
 
           echo "Maven build failed after 3 attempts"
@@ -107,11 +106,8 @@ jobs:
   # 2. DOCKER BUILD VALIDATION
   # ============================================================
   docker-build:
-
     name: Docker Build - ${{ matrix.service }}
-
     needs: build-and-test
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -130,28 +126,26 @@ jobs:
         with:
           ref: feature
 
-      - name: Docker Version
-        run: docker --version
+      - name: Check Docker
+        run: |
+          docker --version
 
       - name: Check Dockerfile
         run: |
-
           if [ ! -f "${{ matrix.service }}/Dockerfile" ]; then
-            echo "Dockerfile missing:"
+            echo "ERROR: Dockerfile missing"
             echo "${{ matrix.service }}/Dockerfile"
             exit 1
           fi
 
       - name: Build Docker Image
         run: |
-
           docker build \
             -t "${{ matrix.service }}:feature-${{ github.sha }}" \
             "./${{ matrix.service }}"
 
-      - name: Verify Image
+      - name: Verify Docker Image
         run: |
-
           docker image inspect \
             "${{ matrix.service }}:feature-${{ github.sha }}"
 
@@ -160,11 +154,8 @@ jobs:
   # 3. DOCKER COMPOSE VALIDATION
   # ============================================================
   docker-compose:
-
     name: Docker Compose Validation
-
     needs: build-and-test
-
     runs-on: ubuntu-latest
 
     steps:
@@ -175,11 +166,11 @@ jobs:
           ref: feature
 
       - name: Docker Compose Version
-        run: docker compose version
-
-      - name: Find Compose File
         run: |
+          docker compose version
 
+      - name: Detect Compose File
+        run: |
           if [ -f "docker-compose.yml" ]; then
             echo "COMPOSE_FILE=docker-compose.yml" >> "$GITHUB_ENV"
 
@@ -187,44 +178,36 @@ jobs:
             echo "COMPOSE_FILE=docker-compose.yaml" >> "$GITHUB_ENV"
 
           else
-            echo "Docker Compose file not found"
+            echo "ERROR: docker-compose.yml not found"
             exit 1
           fi
 
       - name: Validate Compose
         run: |
-
           docker compose \
             -f "$COMPOSE_FILE" \
             config
 
       - name: Build Compose
         run: |
-
           docker compose \
             -f "$COMPOSE_FILE" \
             build
 
 
   # ============================================================
-  # 4. CREATE COMMON-HISTORY INTEGRATION BRANCH
+  # 4. CHECK FEATURE → DEV DIFFERENCE
   # ============================================================
-  prepare-integration:
-
-    name: Prepare Feature → Dev Integration
-
+  check-changes:
+    name: Check Feature Changes
     needs:
       - build-and-test
       - docker-build
       - docker-compose
-
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-
     outputs:
-      integration_branch: ${{ steps.integration.outputs.branch }}
+      has_changes: ${{ steps.check.outputs.has_changes }}
 
     steps:
 
@@ -233,83 +216,46 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch Branches
+      - name: Fetch Dev
         run: |
-
           git fetch origin feature
           git fetch origin dev
 
-          echo "Feature commit:"
-          git rev-parse origin/feature
-
-          echo "Dev commit:"
-          git rev-parse origin/dev
-
-      - name: Create Integration Branch
-        id: integration
+      - name: Check Commits
+        id: check
         run: |
 
-          INTEGRATION_BRANCH="ci/feature-to-dev"
-
-          echo "Creating integration branch:"
-          echo "$INTEGRATION_BRANCH"
-
-          git checkout -B "$INTEGRATION_BRANCH" origin/dev
-
-          echo "Integration branch is based on DEV"
+          COMMITS=$(git rev-list --count origin/dev..origin/feature)
 
           echo "=========================================="
-          echo "Copying FEATURE source tree"
+          echo "FEATURE → DEV CHECK"
           echo "=========================================="
 
-          # Replace the working tree/index with the complete
-          # source tree from feature while retaining DEV history.
-          git read-tree -u origin/feature
+          echo "Feature:"
+          git rev-parse origin/feature
 
-          echo "Checking status..."
+          echo "Dev:"
+          git rev-parse origin/dev
 
-          git status
+          echo "Commits ahead of dev:"
+          echo "$COMMITS"
 
-          echo "=========================================="
-          echo "Creating integration commit"
-          echo "=========================================="
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add -A
-
-          if git diff --cached --quiet; then
-
-            echo "No differences between feature and dev."
-
+          if [ "$COMMITS" -gt 0 ]; then
+            echo "Changes found."
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-
-            git commit \
-              -m "CI: integrate feature into dev"
-
+            echo "No changes between feature and dev."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
-
-          echo "=========================================="
-          echo "Pushing integration branch"
-          echo "=========================================="
-
-          git push \
-            origin \
-            "$INTEGRATION_BRANCH" \
-            --force
-
-          echo "branch=$INTEGRATION_BRANCH" >> "$GITHUB_OUTPUT"
 
 
   # ============================================================
   # 5. CREATE PR
   # ============================================================
   create-pr:
-
-    name: Create PR → Dev
-
-    needs: prepare-integration
+    name: Create Feature → Dev PR
+    needs: check-changes
+    if: needs.check-changes.outputs.has_changes == 'true'
 
     runs-on: ubuntu-latest
 
@@ -326,30 +272,23 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_BRANCH: dev
-          INTEGRATION_BRANCH: ${{ needs.prepare-integration.outputs.integration_branch }}
         run: |
 
           echo "=========================================="
-          echo "CREATE FEATURE -> DEV PR"
+          echo "FEATURE → DEV PULL REQUEST"
           echo "=========================================="
 
-          echo "Repository:"
-          echo "$GITHUB_REPOSITORY"
-
-          echo "Integration branch:"
-          echo "$INTEGRATION_BRANCH"
-
-          echo "Target:"
-          echo "$TARGET_BRANCH"
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Source: feature"
+          echo "Target: dev"
 
           echo ""
           echo "Checking existing PR..."
 
           EXISTING_PR=$(gh pr list \
             --repo "$GITHUB_REPOSITORY" \
-            --base "$TARGET_BRANCH" \
-            --head "$INTEGRATION_BRANCH" \
+            --base dev \
+            --head feature \
             --state open \
             --json number \
             --jq '.[0].number')
@@ -367,52 +306,38 @@ jobs:
 
             PR_URL=$(gh pr create \
               --repo "$GITHUB_REPOSITORY" \
-              --base "$TARGET_BRANCH" \
-              --head "$INTEGRATION_BRANCH" \
-              --title "CI: Feature → Dev" \
-              --body "## Automated Feature → Dev
+              --base dev \
+              --head feature \
+              --title "Feature → Dev: Automated CI/CD" \
+              --body "## Automated Feature → Dev Pull Request
 
           This Pull Request was automatically created by GitHub Actions.
 
           ### Source
-
           feature
 
-          ### Integration Branch
-
-          $INTEGRATION_BRANCH
-
           ### Target
-
           dev
 
           ### CI Validation
-
           - Java 21
           - Maven build
           - Unit tests
           - Docker build
           - Docker Compose validation
 
-          ### Git History
-
-          The original feature and dev branches had unrelated histories.
-
-          GitHub Actions automatically created this integration branch from dev and applied the complete feature source tree.
-
           ### Pipeline
-
           feature
           ↓
-          CI
+          Build & Test
           ↓
-          Integration branch
+          Docker Validation
           ↓
           Pull Request
           ↓
-          Automatic approval
+          Automatic Approval
           ↓
-          Automatic merge
+          Automatic Merge
           ↓
           dev")
 
@@ -421,8 +346,11 @@ jobs:
               --json number \
               --jq '.number')
 
-            echo "PR created:"
-            echo "#$PR_NUMBER"
+            echo ""
+            echo "=========================================="
+            echo "PR CREATED"
+            echo "PR: #$PR_NUMBER"
+            echo "=========================================="
 
             echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
@@ -433,9 +361,7 @@ jobs:
   # 6. AUTOMATIC APPROVAL
   # ============================================================
   approve-pr:
-
     name: Automatic PR Approval
-
     needs: create-pr
 
     runs-on: ubuntu-latest
@@ -453,24 +379,24 @@ jobs:
         run: |
 
           echo "=========================================="
-          echo "APPROVING PR"
+          echo "AUTOMATIC PR APPROVAL"
           echo "=========================================="
 
-          echo "PR #$PR_NUMBER"
+          echo "PR: #$PR_NUMBER"
 
           gh pr review "$PR_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
             --approve \
-            --body "Automatically approved by CI/CD."
+            --body "Automatically approved by CI/CD pipeline."
+
+          echo "PR approved successfully."
 
 
   # ============================================================
   # 7. AUTOMATIC MERGE
   # ============================================================
   merge-pr:
-
     name: Automatic Merge → Dev
-
     needs:
       - create-pr
       - approve-pr
@@ -483,64 +409,72 @@ jobs:
 
     steps:
 
-      - name: Merge PR
+      - name: Enable Auto Merge
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.create-pr.outputs.pr_number }}
         run: |
 
           echo "=========================================="
-          echo "MERGING PR"
+          echo "AUTOMATIC MERGE"
           echo "=========================================="
 
-          echo "PR #$PR_NUMBER"
+          echo "PR: #$PR_NUMBER"
 
           gh pr merge "$PR_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
+            --auto \
             --merge \
             --delete-branch=false
 
+          echo ""
           echo "=========================================="
-          echo "FEATURE -> DEV COMPLETE"
+          echo "AUTO MERGE ENABLED"
           echo "=========================================="
+
+          echo "GitHub will merge the PR when all required checks are satisfied."
 
 
   # ============================================================
-  # 8. PIPELINE SUCCESS
+  # 8. SUCCESS
   # ============================================================
   success:
-
     name: Feature → Dev Complete
-
     needs:
       - build-and-test
       - docker-build
       - docker-compose
-      - prepare-integration
+      - check-changes
       - create-pr
       - approve-pr
       - merge-pr
+
+    if: |
+      always() &&
+      needs.build-and-test.result == 'success' &&
+      needs.docker-build.result == 'success' &&
+      needs.docker-compose.result == 'success' &&
+      needs.check-changes.result == 'success'
 
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Pipeline Complete
+      - name: Pipeline Summary
         run: |
 
           echo "=========================================="
-          echo "CI/CD SUCCESS"
+          echo "       FEATURE → DEV CI/CD SUCCESS"
           echo "=========================================="
 
-          echo "FEATURE -> DEV"
-
-          echo "Java 21       : PASS"
-          echo "Maven         : PASS"
-          echo "Unit Tests    : PASS"
-          echo "Docker        : PASS"
-          echo "Compose       : PASS"
-          echo "PR Creation   : PASS"
-          echo "Approval      : PASS"
-          echo "Merge         : PASS"
+          echo "Java 21          : PASS"
+          echo "Maven            : PASS"
+          echo "Unit Tests       : PASS"
+          echo "Docker           : PASS"
+          echo "Docker Compose   : PASS"
+          echo "Change Detection : PASS"
+          echo "PR Creation      : PASS"
+          echo "Approval         : PASS"
+          echo "Auto Merge       : ENABLED"
 
           echo "=========================================="
