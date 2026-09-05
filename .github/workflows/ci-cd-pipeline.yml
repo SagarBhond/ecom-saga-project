@@ -633,8 +633,17 @@ jobs:
       needs.docker-build.result == 'success' &&
       needs.docker-compose.result == 'success' &&
       needs.check-changes.result == 'success' &&
-      needs.create-pr.result == 'success' &&
-      needs.merge-pr.result == 'success'
+      (
+        (
+          needs.create-pr.result == 'success' &&
+          needs.merge-pr.result == 'success'
+        ) ||
+        (
+          needs.check-changes.outputs.has_changes == 'false' &&
+          needs.create-pr.result == 'skipped' &&
+          needs.merge-pr.result == 'skipped'
+        )
+      )
 
     runs-on: ubuntu-latest
 
@@ -656,8 +665,13 @@ jobs:
           echo "Docker           : PASS"
           echo "Docker Compose   : PASS"
           echo "Change Detection : PASS"
-          echo "PR Creation      : PASS"
-          echo "Auto Merge       : ENABLED"
+          if [ "${{ needs.check-changes.outputs.has_changes }}" = "true" ]; then
+            echo "PR Creation      : PASS"
+            echo "Auto Merge       : ENABLED"
+          else
+            echo "PR Creation      : NOT NEEDED"
+            echo "Auto Merge       : NOT NEEDED"
+          fi
 
           echo ""
 
