@@ -61,8 +61,8 @@ if [ "$ROLE" == "monitoring" ]; then
   sed -i "s|inventory-service:8082|${APP_IP}:8082|g" config/prometheus.yml
   sed -i "s|payment-service:8083|${APP_IP}:8083|g" config/prometheus.yml
   sed -i "s|notification-service:8084|${APP_IP}:8084|g" config/prometheus.yml
-  sed -i "s|node-exporter:9100|${APP_IP}:9100|g" config/prometheus.yml
-  sed -i "s|cadvisor:8080|${APP_IP}:8080|g" config/prometheus.yml
+  sed -i "s|node-exporter-app:9100|${APP_IP}:9100|g" config/prometheus.yml
+  sed -i "s|cadvisor-app:8080|${APP_IP}:8080|g" config/prometheus.yml
 
   echo "✅ config/prometheus.yml updated with IP ${APP_IP}:"
   grep -E "targets:|  - '" config/prometheus.yml || grep "targets" config/prometheus.yml
