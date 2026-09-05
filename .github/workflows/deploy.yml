@@ -19,7 +19,6 @@ permissions:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
 
 jobs:
   deploy:
@@ -31,11 +30,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate deployment secrets
-        run: |
-          test -n "$AWS_REGION" || { echo "AWS_REGION secret is missing"; exit 1; }
-          test -n "$INSTANCE_ID" || { echo "EC2_INSTANCE_ID secret is missing"; exit 1; }
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -44,8 +38,27 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Find application instance
+        id: app
+        shell: bash
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=ecom-saga-app" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "Application instance was not found."
+            exit 1
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
       - name: Deploy application stack
         shell: bash
+        env:
+          INSTANCE_ID: ${{ steps.app.outputs.instance_id }}
         run: |
           set -euo pipefail
 
