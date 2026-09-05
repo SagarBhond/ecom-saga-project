@@ -36,8 +36,12 @@ if [ "$ROLE" == "monitoring" ]; then
 
   # Fetch Instance #1 IP — retry for up to 5 minutes in case it is still booting
   echo "Waiting for ecom-saga-app instance to be running and have a public IP..."
-  APP_IP=""
+  APP_IP="${APP_IP:-}"
+  if [ -n "$APP_IP" ]; then
+    echo "Using app IP supplied by deployment: $APP_IP"
+  fi
   for i in $(seq 1 30); do
+    [ -n "$APP_IP" ] && break
     APP_IP=$(aws ec2 describe-instances \
       --region "$REGION" \
       --filters "Name=tag:Name,Values=ecom-saga-app" "Name=instance-state-name,Values=running" \
@@ -75,8 +79,12 @@ elif [ "$ROLE" == "app" ]; then
 
   # Fetch Instance #2 IP — retry for up to 5 minutes in case it is still booting
   echo "Waiting for ecom-saga-monitoring instance to be running and have a public IP..."
-  MONITORING_IP=""
+  MONITORING_IP="${MONITORING_IP:-}"
+  if [ -n "$MONITORING_IP" ]; then
+    echo "Using monitoring IP supplied by deployment: $MONITORING_IP"
+  fi
   for i in $(seq 1 30); do
+    [ -n "$MONITORING_IP" ] && break
     MONITORING_IP=$(aws ec2 describe-instances \
       --region "$REGION" \
       --filters "Name=tag:Name,Values=ecom-saga-monitoring" "Name=instance-state-name,Values=running" \
