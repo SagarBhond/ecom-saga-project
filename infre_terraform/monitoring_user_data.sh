@@ -33,8 +33,8 @@ fi
 
 cd /home/ec2-user/app
 git fetch origin
-git checkout feature-swagger || git checkout main
-git pull origin feature-swagger || git pull origin main
+git checkout main
+git pull origin main
 
 chmod +x scripts/*.sh
 
