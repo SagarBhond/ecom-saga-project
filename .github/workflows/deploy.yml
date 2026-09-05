@@ -4,14 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_run:
-    workflows:
-      - Feature to Dev CI/CD
-    branches:
-      - feature
-      - main
-    types:
-      - completed
   workflow_dispatch:
 
 permissions:
@@ -23,10 +15,6 @@ env:
 jobs:
   deploy:
     name: Deploy application and monitoring
-    if: >-
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     steps:
@@ -101,10 +89,11 @@ jobs:
               "if [ ! -f .env ]; then cp .env.example .env; fi",
               "chmod +x scripts/*.sh",
               "MONITORING_IP=$MONITORING_IP ./scripts/configure-monitoring-ips.sh app",
-              "docker compose -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml pull",
-              "docker compose -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml down --remove-orphans",
-              "docker compose -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml up -d --pull always --force-recreate",
-              "for i in {1..30}; do curl -sf http://localhost:8081/actuator/prometheus >/dev/null && curl -sf http://localhost:8082/actuator/prometheus >/dev/null && curl -sf http://localhost:8080/metrics >/dev/null && curl -sf http://localhost:9100/metrics >/dev/null && curl -sf http://localhost:9080/ready >/dev/null && exit 0; sleep 5; done",
+              "if docker compose version >/dev/null 2>&1; then COMPOSE=\"docker compose\"; elif command -v docker-compose >/dev/null 2>&1; then COMPOSE=\"docker-compose\"; else echo \"Docker Compose is not installed\"; exit 1; fi",
+              "$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml pull",
+              "$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml down --remove-orphans",
+              "$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml up -d --pull always --force-recreate",
+              "for i in {1..30}; do curl -sf http://localhost:8081/actuator/prometheus >/dev/null && curl -sf http://localhost:8082/actuator/prometheus >/dev/null && curl -sf http://localhost:8080/metrics >/dev/null && curl -sf http://localhost:9100/metrics >/dev/null && exit 0; sleep 5; done",
               "exit 1"
             ]' \
             --query Command.CommandId \
@@ -173,8 +162,9 @@ jobs:
               "git reset --hard origin/main",
               "chmod +x scripts/*.sh",
               "APP_IP=$APP_IP ./scripts/configure-monitoring-ips.sh monitoring",
-              "docker compose -f docker-compose.monitoring.yml down --remove-orphans",
-              "docker compose -f docker-compose.monitoring.yml up -d --pull always --force-recreate",
+              "if docker compose version >/dev/null 2>&1; then COMPOSE=\"docker compose\"; elif command -v docker-compose >/dev/null 2>&1; then COMPOSE=\"docker-compose\"; else echo \"Docker Compose is not installed\"; exit 1; fi",
+              "$COMPOSE -f docker-compose.monitoring.yml down --remove-orphans",
+              "$COMPOSE -f docker-compose.monitoring.yml up -d --pull always --force-recreate",
               "for i in {1..30}; do curl -sf http://localhost:3100/ready >/dev/null && curl -sf http://localhost:9090/-/ready >/dev/null && curl -sf http://localhost:8080/metrics >/dev/null && curl -sf http://localhost:9100/metrics >/dev/null && curl -sf http://localhost:3100/loki/api/v1/labels >/dev/null && exit 0; sleep 5; done",
               "exit 1"
             ]' \
