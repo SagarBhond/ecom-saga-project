@@ -54,11 +54,12 @@ services:
     image: grafana/loki:latest
     container_name: loki
     restart: unless-stopped
+    user: "0"
     ports:
       - "3100:3100"
     volumes:
       - ./config/loki-config.yml:/etc/loki/config.yml:ro
-      - loki_data:/tmp/loki
+      - loki_data:/loki
     command: -config.file=/etc/loki/config.yml
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready >/dev/null || exit 1"]
