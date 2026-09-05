@@ -275,6 +275,9 @@ services:
     volumes:
       - /:/host:ro,rslave
 
+    networks:
+      - saga-net
+
 
   # ============================================================
   # CADVISOR
@@ -296,6 +299,9 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
+
+    networks:
+      - saga-net
 
 
   # ============================================================
@@ -322,6 +328,9 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - promtail_positions:/tmp
+
+    networks:
+      - saga-net
 
 
 # ============================================================
