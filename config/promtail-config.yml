@@ -24,6 +24,8 @@ scrape_configs:
       - source_labels: ['__meta_docker_container_name']
         regex: '/(.+)'
         target_label: service
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: stream
       - target_label: job
         replacement: container-logs
 
