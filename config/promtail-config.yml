@@ -38,17 +38,3 @@ scrape_configs:
           format: RFC3339Nano
       - output:
           source: log
-
-    pipeline_stages:
-      - json:
-          expressions:
-            log: log
-            stream: stream
-            time: time
-      - labels:
-          stream:
-      - timestamp:
-          source: time
-          format: RFC3339Nano
-      - output:
-          source: log
