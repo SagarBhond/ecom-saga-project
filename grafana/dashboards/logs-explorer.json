@@ -17,7 +17,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "Loki" },
-          "expr": "{job=\"container-logs\"}",
+          "expr": "{job=\"container-logs\", host=\"app-host\"}",
           "refId": "A"
         }
       ],

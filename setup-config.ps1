@@ -39,6 +39,7 @@ scrape_configs:
           - localhost
         labels:
           job: container-logs
+          host: app-host
           __path__: /var/lib/docker/containers/*/*.log
 
     pipeline_stages:
