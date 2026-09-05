@@ -38,34 +38,6 @@ data "aws_subnets" "default" {
   }
 }
 
-data "aws_security_group" "app_existing" {
-  name   = "${var.project_name}-sg"
-  vpc_id = data.aws_vpc.default.id
-}
-
-data "aws_iam_role" "instance_existing" {
-  name = "${var.project_name}-ec2-role"
-}
-
-data "aws_cloudwatch_log_group" "app_existing" {
-  name = "/${var.project_name}/app"
-}
-
-import {
-  to = aws_security_group.app
-  id = data.aws_security_group.app_existing.id
-}
-
-import {
-  to = aws_iam_role.instance
-  id = data.aws_iam_role.instance_existing.name
-}
-
-import {
-  to = aws_cloudwatch_log_group.app
-  id = data.aws_cloudwatch_log_group.app_existing.name
-}
-
 # ============================================================================
 # AMAZON LINUX 2023 AMI
 # ============================================================================

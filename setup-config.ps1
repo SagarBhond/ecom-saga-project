@@ -1,46 +1,59 @@
 $folders = @(
   "config",
   "grafana\provisioning\datasources",
-  "grafana\provisioning\dashboards",
-  "grafana\dashboards"
-)
-foreach ($f in $folders) { New-Item -ItemType Directory -Force -Path $f | Out-Null }
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://localhost:9093
+
+limits_config:
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  allow_structured_metadata: false
+'@ | Set-Content -Path "config\loki-config.yml" -Encoding UTF8
 
 @'
 # ============================================================================
-# Prometheus scrape configuration
-# All targets use Docker Compose SERVICE NAMES (not IPs) - this only works
-# because prometheus and every target here share the "saga-net" network in
-# docker-compose.yml. Do NOT reintroduce IP-based targets here unless
-# you go back to the split app/monitoring-instance setup.
+# Promtail config - static Docker log discovery
 # ============================================================================
 
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: ${LOKI_URL}
 
 scrape_configs:
-
-  # Prometheus scraping itself
-  - job_name: 'prometheus'
+  - job_name: docker-container-logs
     static_configs:
-      - targets: ['localhost:9090']
-
-  # Spring Boot services - requires micrometer-registry-prometheus on the
-  # classpath and management.endpoints.web.exposure.include=prometheus (or
-  # "*") in each service's application.yml/properties, exposing
-  # GET /actuator/prometheus
-  - job_name: 'order-service'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['order-service:8081']
+      - targets:
+          - localhost
         labels:
-          service: 'order-service'
+          job: container-logs
+          __path__: /var/lib/docker/containers/*/*.log
 
-  - job_name: 'inventory-service'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['inventory-service:8082']
+    pipeline_stages:
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+      - labels:
+          stream
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      - output:
+          source: log
         labels:
           service: 'inventory-service'
 
@@ -112,26 +125,12 @@ common:
 schema_config:
   configs:
     - from: 2024-01-01
-      store: tsdb
-      object_store: filesystem
-      schema: v13
-      index:
-        prefix: index_
-        period: 24h
-
-ruler:
-  alertmanager_url: http://localhost:9093
-
-limits_config:
-  reject_old_samples: true
-  reject_old_samples_max_age: 168h
-  allow_structured_metadata: false
-'@ | Set-Content -Path "config\loki-config.yml" -Encoding UTF8
-
-@'
-# ============================================================================
-# Promtail config - auto-discovers every running container via the Docker
-# socket and ships its logs to Loki. $LOKI_URL is injected from the
+      static_configs:
+        - targets:
+            - localhost
+          labels:
+            job: container-logs
+            __path__: /var/lib/docker/containers/*/*.log
 # environment via `-config.expand-env=true` in the promtail service's
 # "command:" (see docker-compose.yml).
 # ============================================================================
