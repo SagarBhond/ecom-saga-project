@@ -8,10 +8,23 @@ scrape_configs:
     static_configs:
       - targets:
           - 'order-service:8081'
+        labels:
+          service: 'order-service'
+          environment: 'production'
+      - targets:
           - 'inventory-service:8082'
+        labels:
+          service: 'inventory-service'
+          environment: 'production'
+      - targets:
           - 'payment-service:8083'
+        labels:
+          service: 'payment-service'
+          environment: 'production'
+      - targets:
           - 'notification-service:8084'
         labels:
+          service: 'notification-service'
           environment: 'production'
 
   - job_name: 'node-exporter'
