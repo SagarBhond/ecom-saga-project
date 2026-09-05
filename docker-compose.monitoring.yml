@@ -25,6 +25,7 @@ services:
       - "3100:3100"
     volumes:
       - ./config/loki-config.yml:/etc/loki/config.yml:ro
+      - loki_data:/tmp/loki
     command: -config.file=/etc/loki/config.yml
     networks: [saga-net]
 
@@ -54,3 +55,6 @@ networks:
   saga-net:
     name: saga-net
     driver: bridge
+
+volumes:
+  loki_data:

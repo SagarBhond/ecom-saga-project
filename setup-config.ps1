@@ -131,18 +131,35 @@ clients:
   - url: ${LOKI_URL}
 
 scrape_configs:
-  - job_name: docker
+  - job_name: docker-container-logs
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
     relabel_configs:
-      # Use the container name (minus leading slash) as the "container" label
       - source_labels: ['__meta_docker_container_name']
         regex: '/(.*)'
         target_label: 'container'
-      # Carry the compose service name through as a label, if present
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
         target_label: 'compose_service'
+      - source_labels: ['__meta_docker_container_id']
+        target_label: '__path__'
+        replacement: /var/lib/docker/containers/$1/$1-json.log
+      - target_label: 'job'
+        replacement: container-logs
+
+    pipeline_stages:
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+      - labels:
+          stream
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      - output:
+          source: log
 '@ | Set-Content -Path "config\promtail-config.yml" -Encoding UTF8
 
 @'

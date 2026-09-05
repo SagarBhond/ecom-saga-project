@@ -20,7 +20,7 @@ name: Deploy to EC2
 on:
   workflow_run:
     workflows: ["CI Pipeline"]
-    branches: [main, feature-swagger]
+    branches: [main, feature]
     types: [completed]
   workflow_dispatch: {}
 
@@ -57,7 +57,7 @@ jobs:
           # ── Determine target branch ───────────────────────────────────────────
           TARGET_BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
           if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" == "" ]; then
-            TARGET_BRANCH="feature-swagger"
+            TARGET_BRANCH="main"
           fi
           echo "Target branch: $TARGET_BRANCH"
 
@@ -76,8 +76,8 @@ jobs:
               \"if [ ! -f .env ]; then cp .env.example .env; fi\",
               \"chmod +x scripts/*.sh\",
               \"./scripts/configure-monitoring-ips.sh app\",
-              \"docker compose -f docker-compose.yml -f Infrastructure/docker-compose.prod.yml pull\",
-              \"docker compose -f docker-compose.yml -f Infrastructure/docker-compose.prod.yml up -d --force-recreate\",
+              \"docker compose -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml pull\",
+              \"docker compose -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml up -d --force-recreate\",
               \"echo Waiting for services to start...\",
               \"for i in {1..30}; do if curl -sf http://localhost:8081/actuator/health && curl -sf http://localhost:8082/actuator/health && curl -sf http://localhost:8083/actuator/health && curl -sf http://localhost:8084/actuator/health; then echo All microservices healthy!; break; fi; sleep 3; done\",
               \"echo App Stack deployment complete\"
@@ -129,7 +129,7 @@ jobs:
           # ── Determine target branch ───────────────────────────────────────────
           TARGET_BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
           if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" == "" ]; then
-            TARGET_BRANCH="feature-swagger"
+            TARGET_BRANCH="main"
           fi
           echo "Target branch: $TARGET_BRANCH"
 
