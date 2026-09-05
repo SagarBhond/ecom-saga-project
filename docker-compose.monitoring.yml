@@ -61,12 +61,6 @@ services:
       - ./config/loki-config.yml:/etc/loki/config.yml:ro
       - loki_data:/loki
     command: -config.file=/etc/loki/config.yml
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready >/dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
     networks:
       saga-net:
         aliases:
@@ -93,7 +87,7 @@ services:
       prometheus:
         condition: service_started
       loki:
-        condition: service_healthy
+        condition: service_started
     networks:
       saga-net:
         aliases:
