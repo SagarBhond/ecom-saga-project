@@ -121,7 +121,7 @@ jobs:
               "chmod +x scripts/*.sh",
               "./scripts/configure-monitoring-ips.sh monitoring",
               "docker compose -f docker-compose.monitoring.yml up -d --force-recreate",
-              "for i in {1..30}; do curl -sf http://localhost:3100/ready >/dev/null && curl -sf http://localhost:9080/ready >/dev/null && curl -sf http://localhost:9090/-/ready >/dev/null && exit 0; sleep 5; done",
+              "for i in {1..30}; do curl -sf http://localhost:3100/ready >/dev/null && curl -sf http://localhost:9080/ready >/dev/null && curl -sf http://localhost:9090/-/ready >/dev/null && curl -sf http://localhost:8080/metrics >/dev/null && curl -sf http://localhost:9100/metrics >/dev/null && exit 0; sleep 5; done",
               "exit 1"
             ]' \
             --query Command.CommandId \
