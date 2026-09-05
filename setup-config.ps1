@@ -62,11 +62,27 @@ scrape_configs:
   - job_name: 'node-exporter'
     static_configs:
       - targets: ['node-exporter:9100']
+        labels:
+          instance_type: 'ec2-monitoring-host'
+
+  - job_name: 'node-exporter-app-host'
+    static_configs:
+      - targets: ['node-exporter-app:9100']
+        labels:
+          instance_type: 'ec2-app-host'
 
   # Per-container resource metrics
   - job_name: 'cadvisor'
     static_configs:
       - targets: ['cadvisor:8080']
+        labels:
+          instance_type: 'monitoring-containers'
+
+  - job_name: 'cadvisor-app-host'
+    static_configs:
+      - targets: ['cadvisor-app:8080']
+        labels:
+          instance_type: 'app-containers'
 '@ | Set-Content -Path "config\prometheus.yml" -Encoding UTF8
 
 @'
