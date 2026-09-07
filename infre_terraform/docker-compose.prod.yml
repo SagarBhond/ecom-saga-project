@@ -52,6 +52,9 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
       H2_CONSOLE_ENABLED: "true"
+      SPRING_DATASOURCE_URL: "jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ""
 
 
   # ============================================================
@@ -68,6 +71,9 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
       H2_CONSOLE_ENABLED: "true"
+      SPRING_DATASOURCE_URL: "jdbc:h2:file:/var/lib/inventory/inventorydb;DB_CLOSE_ON_EXIT=FALSE"
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ""
 
 
   # ============================================================
@@ -84,6 +90,9 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
       H2_CONSOLE_ENABLED: "true"
+      SPRING_DATASOURCE_URL: "jdbc:h2:mem:paymentdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ""
 
 
   # ============================================================
@@ -100,3 +109,6 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx160m -Xms96m"
       H2_CONSOLE_ENABLED: "true"
+      SPRING_DATASOURCE_URL: "jdbc:h2:mem:notificationdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ""
