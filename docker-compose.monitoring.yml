@@ -28,7 +28,10 @@ services:
       - ./config/loki-config.yml:/etc/loki/config.yml:ro
       - loki_data:/loki
     command: -config.file=/etc/loki/config.yml
-    networks: [saga-net]
+    networks:
+      saga-net:
+        aliases:
+          - loki
 
   # --------------------------------------------------------------------
   # Grafana Dashboard UI (Port 3000) - Pre-configured auto-dashboards
@@ -48,9 +51,14 @@ services:
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
-      - prometheus
-      - loki
-    networks: [saga-net]
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+    networks:
+      saga-net:
+        aliases:
+          - grafana
 
 networks:
   saga-net:
