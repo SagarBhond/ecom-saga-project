@@ -4,19 +4,53 @@ on:
   push:
     branches:
       - main
+      - dev
+      - feature
   pull_request:
     branches:
+      - dev
       - main
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: write
 
 env:
   AWS_REGION: ap-south-1
   DOCKERHUB_USERNAME: sagarbhond
 
 jobs:
+  create-integration-pr:
+    name: Create Integration Pull Request
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/feature' || github.ref == 'refs/heads/dev') }}
+    steps:
+      - name: Open the next integration pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$HEAD_BRANCH" = "feature" ]; then
+            BASE_BRANCH="dev"
+            TITLE="Feature -> Dev: ${GITHUB_SHA::7}"
+          else
+            BASE_BRANCH="main"
+            TITLE="Dev -> Main: ${GITHUB_SHA::7}"
+          fi
+
+          if gh pr list --base "$BASE_BRANCH" --head "$HEAD_BRANCH" --state open --json number --jq 'length' | grep -q '^0$'; then
+            gh pr create \
+              --base "$BASE_BRANCH" \
+              --head "$HEAD_BRANCH" \
+              --title "$TITLE" \
+              --body "Automated integration PR from $HEAD_BRANCH into $BASE_BRANCH for commit ${GITHUB_SHA}."
+          else
+            echo "An open $HEAD_BRANCH -> $BASE_BRANCH pull request already exists."
+          fi
+
   build-and-test:
     name: Build and Test ${{ matrix.service }}
     runs-on: ubuntu-latest
