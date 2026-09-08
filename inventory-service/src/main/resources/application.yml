@@ -6,7 +6,7 @@ spring:
     name: inventory-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:inventorydb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/inventorydb;DB_CLOSE_ON_EXIT=FALSE}
     driver-class-name: org.h2.Driver
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:root}

@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "instance_type" {
   description = "EC2 instance type for application server."
   type        = string
-  default     = "c7i.large"
+  default     = "c7i-flex.large"
 }
 
 variable "monitoring_instance_type" {
