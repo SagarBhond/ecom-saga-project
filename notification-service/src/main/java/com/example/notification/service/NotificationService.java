@@ -157,8 +157,12 @@ public class NotificationService {
             message.append("Quantity: ").append(payload.get("quantity")).append("\n");
         }
         if (payload.containsKey("amount") || payload.containsKey("totalAmount")) {
-            Double amount = (Double) payload.getOrDefault("totalAmount",
-                    payload.getOrDefault("amount", 0.0));
+            Object amountValue = payload.containsKey("totalAmount")
+                    ? payload.get("totalAmount")
+                    : payload.get("amount");
+            Double amount = amountValue instanceof Number
+                    ? ((Number) amountValue).doubleValue()
+                    : 0.0;
             message.append("Amount: $").append(String.format("%.2f", amount)).append("\n");
         }
         message.append("\nThank you for your business!");

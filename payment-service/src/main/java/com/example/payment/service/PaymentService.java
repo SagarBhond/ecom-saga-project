@@ -156,7 +156,10 @@ public class PaymentService {
     private boolean isPaymentDeclinedByBusinessRule(Map<String, Object> payload) {
         // Example business rules:
         // 1. Amount > 10000 - might trigger fraud check
-        Double amount = (Double) payload.getOrDefault("amount", 0.0);
+        Object amountValue = payload.get("amount");
+        Double amount = amountValue instanceof Number
+            ? ((Number) amountValue).doubleValue()
+            : 0.0;
         if (amount > 10000.0) {
             log.info("Payment declined: amount {} exceeds limit", amount);
             return true;
@@ -332,7 +335,9 @@ public class PaymentService {
             if (existingPayment.isEmpty()) {
                 Payment payment = Payment.builder()
                         .orderId(orderId)
-                        .amount((Double) incomingPayload.getOrDefault("amount", 0.0))
+                        .amount(incomingPayload.get("amount") instanceof Number
+                            ? ((Number) incomingPayload.get("amount")).doubleValue()
+                            : 0.0)
                         .status(PaymentStatus.FAILED)
                         .build();
                 paymentRepository.save(payment);
