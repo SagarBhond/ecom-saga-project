@@ -86,4 +86,13 @@ chmod +x scripts/*.sh
 # Configure Promtail to ship logs to the monitoring instance
 ./scripts/configure-monitoring-ips.sh app
 
-echo "Bootstrap complete; application deployment is managed by GitHub Actions." > /var/log/bootstrap-done.log
+# Start the stack on first boot as well as through CI/CD, so the instance is
+# usable even when no GitHub Actions deployment has run yet.
+COMPOSE="/usr/local/bin/docker-compose"
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE="docker compose"
+fi
+$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml pull
+$COMPOSE -f docker-compose.yml -f infre_terraform/docker-compose.prod.yml up -d
+
+echo "Bootstrap complete; application stack started." > /var/log/bootstrap-done.log
