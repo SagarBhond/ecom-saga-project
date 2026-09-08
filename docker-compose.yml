@@ -262,6 +262,30 @@ services:
       - saga-net
 
 
+  # ============================================================
+  # PROMTAIL LOG SHIPPER
+  # ============================================================
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+
+    environment:
+      LOKI_URL: ${LOKI_URL:-http://loki:3100/loki/api/v1/push}
+
+    command:
+      - -config.file=/etc/promtail/config.yml
+      - -config.expand-env=true
+
+    volumes:
+      - ./config/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    networks:
+      - saga-net
+
+
 # ============================================================
 # NETWORK
 # ============================================================
