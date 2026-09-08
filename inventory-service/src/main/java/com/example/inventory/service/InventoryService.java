@@ -398,7 +398,8 @@ public class InventoryService {
 
         try {
             String productId = (String) incomingPayload.get("productId");
-            Integer qty = (Integer) incomingPayload.get("quantity");
+            Number quantityValue = (Number) incomingPayload.get("quantity");
+            Integer qty = quantityValue != null ? quantityValue.intValue() : null;
 
             if (productId == null || qty == null) {
                 log.error("Invalid payload for order {}: missing productId or quantity", orderId);
